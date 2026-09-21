@@ -1,0 +1,49 @@
+certame:
+  test-support:
+    enabled: true
+  official:
+    content-update-interval: 1h
+  jwt:
+    private-key: "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg1ariM0FhiAI/MaqECWrlYxlGQ+K/uX4r7ii1T7odQGChRANCAASNXLS0GR2ZLRtv+MpoS3McDE7EB0F8X8fr12gx80da596aD7GSkdxfyVPu/xnho+OucXs+QMGLA0HfpG0f2CT6"
+    public-key: "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEjVy0tBkdmS0bb/jKaEtzHAxOxAdBfF/H69doMfNHWufemg+xkpHcX8lT7v8Z4aPjrnF7PkDBiwNB36RtH9gk+g=="
+    access-token-ttl: 15m
+  client:
+    frontend-origin: https://certamecards.localhost
+    client-header-value: web
+  refresh-cookie:
+    name: __Host-certame_rt
+    ttl: 90d
+    secure: true
+  one-time-token:
+    confirm-email-ttl: 24h
+    reset-password-ttl: 1h
+    link-google-ttl: 10m
+    reauth-ttl: 5m
+  login-throttle:
+    max-failures: 5
+    lock-window: 15m
+  register-rate-limit:
+    max-requests: 1000
+    window: 1m
+  terms:
+    current-version: "2026-09-01"
+  admin:
+    bootstrap-email:
+  google:
+    client-id:
+    client-secret:
+  mail:
+    from-address: naoresponda@certamecards.com.br
+    from-name: CertameCards
+  cookie-encryption:
+    key: "QabpsXTm+MPu629aETSuCTTfJn+qhnPjeQp3KPGn8CQ="
+
+spring:
+  mail:
+    host: localhost
+    port: 1025
+    username: test
+    password: test
+  jpa:
+    hibernate:
+      ddl-auto: validate

@@ -1,0 +1,17 @@
+package br.com.certamecards.review.service;
+
+import java.time.Instant;
+import java.util.UUID;
+
+public record ReviewLogInput(
+        UUID id,
+        UUID cardId,
+        String kind,
+        Short rating,
+        Instant reviewedAt,
+        int durationMs,
+        String stateBefore,
+        String stateAfter,
+        boolean offline,
+        UUID deviceId,
+        UUID sessionId) {}

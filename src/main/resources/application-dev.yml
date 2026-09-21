@@ -1,0 +1,23 @@
+certame:
+  test-support:
+    enabled: true
+  client:
+    frontend-origin: ${CERTAME_FRONTEND_ORIGIN:http://localhost:4200}
+  refresh-cookie:
+    name: certame_rt
+    secure: false
+  register-rate-limit:
+    max-requests: 200
+    window: 1m
+
+spring:
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+
+logging:
+  structured:
+    format:
+      console:
