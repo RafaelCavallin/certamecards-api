@@ -3,6 +3,7 @@ package br.com.certamecards.auth.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
@@ -51,6 +52,13 @@ public class RefreshToken {
     public RefreshToken(UUID id, UUID userId, UUID familyId, String tokenHash, Instant expiresAt, Instant createdAt) {
         this(id, userId, familyId, tokenHash, expiresAt);
         this.createdAt = createdAt;
+    }
+
+    @PrePersist
+    private void ensureCreatedAt() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
     }
 
     public void revoke(Instant now) {

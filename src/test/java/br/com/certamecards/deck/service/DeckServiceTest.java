@@ -75,7 +75,7 @@ class DeckServiceTest {
         UUID deckId = UUID.randomUUID();
         Deck deck = new Deck(deckId, ownerId, UUID.randomUUID(), "Antigo");
         when(deckRepository.findByIdAndOwnerId(deckId, ownerId)).thenReturn(Optional.of(deck));
-        when(deckRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(deckRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
         UpdateDeckCommand command = new UpdateDeckCommand(null, new DeckContent("Novo nome", null), 0);
 
         Deck updated = deckService.update(ownerId, deckId, command);
@@ -117,7 +117,7 @@ class DeckServiceTest {
         UUID newSubjectId = UUID.randomUUID();
         Deck deck = new Deck(deckId, ownerId, UUID.randomUUID(), "Antigo");
         when(deckRepository.findByIdAndOwnerId(deckId, ownerId)).thenReturn(Optional.of(deck));
-        when(deckRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(deckRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
         when(subjectLookup.requireActive(newSubjectId)).thenReturn(new Subject("Nova", "nova"));
         UpdateDeckCommand command = new UpdateDeckCommand(newSubjectId, null, 0);
 

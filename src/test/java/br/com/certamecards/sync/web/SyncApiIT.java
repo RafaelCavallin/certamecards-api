@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -22,6 +23,8 @@ import jakarta.mail.internet.MimeMessage;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,6 +39,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -88,12 +92,16 @@ class SyncApiIT {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
-        var subjects = objectMapper.readTree(body).get("subjects");
+        var changes = objectMapper.readTree(body).get("changes");
         boolean found = false;
-        for (var node : subjects) {
-            if (node.get("id").asString().equals(subjectId.toString())) {
-                assertThat(node.get("name").asString()).isEqualTo("Matéria Renomeada");
-                assertThat(node.get("active").asBoolean()).isFalse();
+        for (var change : changes) {
+            if (!"subject".equals(change.get("type").asString())) {
+                continue;
+            }
+            var payload = change.get("payload");
+            if (payload.get("id").asString().equals(subjectId.toString())) {
+                assertThat(payload.get("name").asString()).isEqualTo("Matéria Renomeada");
+                assertThat(payload.get("active").asBoolean()).isFalse();
                 found = true;
             }
         }
@@ -124,10 +132,18 @@ class SyncApiIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"id\":\"" + UUID.randomUUID() + "\",\"front\":\"Frente\",\"back\":\"Verso\"}"))
                 .andExpect(status().isCreated());
+        mockMvc.perform(put("/api/me/settings")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newPerDay\":30,\"reviewsPerDay\":200,\"focusMinutes\":25,\"examDate\":null,"
+                                + "\"timeZone\":\"America/Sao_Paulo\",\"theme\":\"noite\"}"))
+                .andExpect(status().isOk());
 
         long cursor = 0;
         boolean hasMore = true;
         int pages = 0;
+        Set<String> seenTypes = new HashSet<>();
+        Set<Long> seenChangeSeqs = new HashSet<>();
         while (hasMore) {
             String body = mockMvc.perform(get("/api/sync/changes?cursor=" + cursor + "&limit=1")
                             .header("Authorization", "Bearer " + token))
@@ -136,12 +152,17 @@ class SyncApiIT {
                     .getResponse()
                     .getContentAsString();
             var node = objectMapper.readTree(body);
+            for (var change : node.get("changes")) {
+                seenTypes.add(change.get("type").asString());
+                assertThat(seenChangeSeqs.add(change.get("changeSeq").asLong())).isTrue();
+            }
             hasMore = node.get("hasMore").asBoolean();
             cursor = node.get("nextCursor").asLong();
             pages++;
             assertThat(pages).isLessThan(50);
         }
         assertThat(pages).isGreaterThan(1);
+        assertThat(seenTypes).contains("deck", "card", "settings");
     }
 
     @Test
@@ -154,6 +175,7 @@ class SyncApiIT {
     }
 
     @Test
+    @DirtiesContext
     void givenCursorBeforePurgeWatermark_whenPulling_thenResyncRequired() throws Exception {
         String token = registerConfirmAndLogin("nando.candidato@exemplo.com", "Nando");
         UUID subjectId = subjectRepository.findAll().get(0).getId();

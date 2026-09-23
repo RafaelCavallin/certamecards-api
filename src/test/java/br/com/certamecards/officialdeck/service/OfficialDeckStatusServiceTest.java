@@ -3,6 +3,7 @@ package br.com.certamecards.officialdeck.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -17,6 +18,7 @@ import br.com.certamecards.officialdeck.domain.OfficialDeckDeletionGuard;
 import br.com.certamecards.officialdeck.domain.OfficialDeckStatus;
 import br.com.certamecards.officialdeck.domain.OfficialDeckStatusTransitions;
 import br.com.certamecards.support.MutableClock;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
@@ -29,8 +31,9 @@ class OfficialDeckStatusServiceTest {
     private final OfficialDeckDeletionGuard deletionGuard = mock(OfficialDeckDeletionGuard.class);
     private final OfficialDeckAuditRecorder auditRecorder = mock(OfficialDeckAuditRecorder.class);
     private final MutableClock clock = new MutableClock(Instant.parse("2026-09-19T14:00:00Z"), ZoneOffset.UTC);
-    private final OfficialDeckStatusService service =
-            new OfficialDeckStatusService(deckAccess, statusTransitions, deletionGuard, auditRecorder, clock);
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    private final OfficialDeckStatusService service = new OfficialDeckStatusService(
+            deckAccess, statusTransitions, deletionGuard, auditRecorder, clock, new OfficialMetrics(registry));
     private final UUID actorId = UUID.randomUUID();
 
     @Test
@@ -88,5 +91,27 @@ class OfficialDeckStatusServiceTest {
         Deck deck = new Deck(deckId, null, UUID.randomUUID(), "CF/88", DeckOrigin.OFFICIAL_SUBSCRIPTION);
         deck.getOfficialMeta().markDraft(clock.instant());
         return deck;
+    }
+
+    @Test
+    void givenAppliedAndRejectedTransitions_whenChangingStatus_thenCountsEachResult() {
+        UUID deckId = UUID.randomUUID();
+        Deck deck = draftDeck(deckId);
+        when(deckAccess.lockOfficial(deckId)).thenReturn(deck);
+        when(deckAccess.save(deck)).thenReturn(deck);
+        service.changeStatus(actorId, deckId, OfficialDeckStatus.PUBLISHED, 0);
+        org.mockito.Mockito.doThrow(ApiException.of(ErrorCode.OFFICIAL_DECK_HAS_SUBSCRIBERS))
+                .when(statusTransitions)
+                .validate(any(), any(), anyInt(), anyInt());
+
+        assertThatThrownBy(() -> service.changeStatus(actorId, deckId, OfficialDeckStatus.DRAFT, 0))
+                .isInstanceOf(ApiException.class);
+
+        assertThat(registry.counter("official.deck.status", "to", "published", "result", "applied")
+                        .count())
+                .isEqualTo(1);
+        assertThat(registry.counter("official.deck.status", "to", "draft", "result", "rejected")
+                        .count())
+                .isEqualTo(1);
     }
 }

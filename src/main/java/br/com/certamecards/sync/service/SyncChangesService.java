@@ -2,21 +2,16 @@ package br.com.certamecards.sync.service;
 
 import br.com.certamecards.common.error.ApiException;
 import br.com.certamecards.common.error.ErrorCode;
+import br.com.certamecards.sync.domain.ChangeEntry;
 import br.com.certamecards.sync.domain.ChangesPage;
 import br.com.certamecards.sync.domain.SyncLimits;
-import br.com.certamecards.sync.persistence.CardStatesChangesQuery;
-import br.com.certamecards.sync.persistence.CardsChangesQuery;
-import br.com.certamecards.sync.persistence.DecksChangesQuery;
+import br.com.certamecards.sync.persistence.GlobalChangesQuery;
 import br.com.certamecards.sync.persistence.PurgeWatermarkQuery;
-import br.com.certamecards.sync.persistence.ReviewLogsChangesQuery;
-import br.com.certamecards.sync.persistence.ReviewVoidsChangesQuery;
-import br.com.certamecards.sync.persistence.SettingsChangesQuery;
-import br.com.certamecards.sync.persistence.SubjectsChangesQuery;
-import br.com.certamecards.sync.persistence.SubscriptionsChangesQuery;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -25,38 +20,17 @@ public class SyncChangesService {
 
     private static final String PAGE_ITEMS_METRIC = "sync.changes.page_items";
 
-    private final SubjectsChangesQuery subjectsQuery;
-    private final DecksChangesQuery decksQuery;
-    private final CardsChangesQuery cardsQuery;
-    private final CardStatesChangesQuery cardStatesQuery;
-    private final ReviewLogsChangesQuery reviewLogsQuery;
-    private final ReviewVoidsChangesQuery reviewVoidsQuery;
-    private final SubscriptionsChangesQuery subscriptionsQuery;
-    private final SettingsChangesQuery settingsQuery;
+    private final GlobalChangesQuery globalChangesQuery;
     private final PurgeWatermarkQuery watermarkQuery;
     private final MeterRegistry meterRegistry;
     private final Clock clock;
 
     public SyncChangesService(
-            SubjectsChangesQuery subjectsQuery,
-            DecksChangesQuery decksQuery,
-            CardsChangesQuery cardsQuery,
-            CardStatesChangesQuery cardStatesQuery,
-            ReviewLogsChangesQuery reviewLogsQuery,
-            ReviewVoidsChangesQuery reviewVoidsQuery,
-            SubscriptionsChangesQuery subscriptionsQuery,
-            SettingsChangesQuery settingsQuery,
+            GlobalChangesQuery globalChangesQuery,
             PurgeWatermarkQuery watermarkQuery,
             MeterRegistry meterRegistry,
             Clock clock) {
-        this.subjectsQuery = subjectsQuery;
-        this.decksQuery = decksQuery;
-        this.cardsQuery = cardsQuery;
-        this.cardStatesQuery = cardStatesQuery;
-        this.reviewLogsQuery = reviewLogsQuery;
-        this.reviewVoidsQuery = reviewVoidsQuery;
-        this.subscriptionsQuery = subscriptionsQuery;
-        this.settingsQuery = settingsQuery;
+        this.globalChangesQuery = globalChangesQuery;
         this.watermarkQuery = watermarkQuery;
         this.meterRegistry = meterRegistry;
         this.clock = clock;
@@ -64,18 +38,12 @@ public class SyncChangesService {
 
     public ChangesPage changesSince(UUID userId, long cursor, int limit) {
         ensureCursorNotPurged(cursor);
-        ChangesPageBuilder builder = new ChangesPageBuilder(limit);
-        builder.addSubjects(subjectsQuery.fetch(cursor, builder.remaining()));
-        builder.addDecks(decksQuery.fetch(userId, cursor, builder.remaining()));
-        builder.addCards(cardsQuery.fetch(userId, cursor, builder.remaining()));
-        builder.addCardStates(cardStatesQuery.fetch(userId, cursor, builder.remaining()));
-        builder.addReviewLogs(reviewLogsQuery.fetch(userId, cursor, builder.remaining(), reviewLogWindowStart()));
-        builder.addReviewVoids(reviewVoidsQuery.fetch(userId, cursor, builder.remaining()));
-        builder.addSubscriptions(subscriptionsQuery.fetch(userId, cursor, builder.remaining()));
-        builder.setSettings(settingsQuery.fetch(userId, cursor));
-        ChangesPage page = builder.build(cursor, limit);
-        meterRegistry.summary(PAGE_ITEMS_METRIC).record(builder.itemCount());
-        return page;
+        List<ChangeEntry> fetched = globalChangesQuery.fetch(userId, cursor, limit + 1, reviewLogWindowStart());
+        boolean hasMore = fetched.size() > limit;
+        List<ChangeEntry> page = hasMore ? fetched.subList(0, limit) : fetched;
+        long nextCursor = page.isEmpty() ? cursor : page.get(page.size() - 1).changeSeq();
+        meterRegistry.summary(PAGE_ITEMS_METRIC).record(page.size());
+        return new ChangesPage(clock.instant(), page, nextCursor, hasMore);
     }
 
     private Instant reviewLogWindowStart() {

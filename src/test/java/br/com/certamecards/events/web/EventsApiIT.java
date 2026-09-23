@@ -41,6 +41,18 @@ class EventsApiIT {
     }
 
     @Test
+    void givenLibraryEvent_whenSubmitting_thenAcceptedAndPersisted() throws Exception {
+        UUID eventId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(eventsBody(eventId, "deck_subscribed")))
+                .andExpect(status().isAccepted());
+
+        assertThat(productEventRepository.findById(eventId)).isPresent();
+    }
+
+    @Test
     void givenNameOutsideClosedList_whenSubmitting_thenAcceptedButNotPersisted() throws Exception {
         UUID eventId = UUID.randomUUID();
 

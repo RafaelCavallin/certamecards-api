@@ -45,7 +45,7 @@ public class CardService {
         Deck deck = deckService.lockOwned(command.ownerId(), command.deckId());
         ensureWithinLimits(deck.getId(), command.ownerId());
         Card card = buildCard(command, deck.getId());
-        return new CardCreationResult(cardRepository.save(card), true);
+        return new CardCreationResult(cardRepository.saveAndFlush(card), true);
     }
 
     @Transactional
@@ -55,7 +55,7 @@ public class CardService {
         CardContent content = command.content();
         card.editContent(content.front().strip(), content.back().strip(), content.normalizedSource());
         card.touch(clock.instant());
-        return cardRepository.save(card);
+        return cardRepository.saveAndFlush(card);
     }
 
     @Transactional

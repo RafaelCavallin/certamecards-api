@@ -17,22 +17,26 @@ public class DeckPreviewService {
     private final DeckAvailabilityGuard availabilityGuard;
     private final LibraryDeckLookupQuery lookupQuery;
     private final LibraryProperties properties;
+    private final LibraryMetrics metrics;
 
     public DeckPreviewService(
             OfficialDeckAccess deckAccess,
             DeckAvailabilityGuard availabilityGuard,
             LibraryDeckLookupQuery lookupQuery,
-            LibraryProperties properties) {
+            LibraryProperties properties,
+            LibraryMetrics metrics) {
         this.deckAccess = deckAccess;
         this.availabilityGuard = availabilityGuard;
         this.lookupQuery = lookupQuery;
         this.properties = properties;
+        this.metrics = metrics;
     }
 
     public DeckPreview preview(UUID userId, UUID deckId) {
         availabilityGuard.ensurePublished(deckAccess.findOfficial(deckId));
         LibraryDeckSummary summary =
                 lookupQuery.findSummary(userId, deckId).orElseThrow(() -> ApiException.of(ErrorCode.NOT_FOUND));
+        metrics.preview();
         return new DeckPreview(summary, lookupQuery.previewCards(deckId, properties.previewCards()));
     }
 }

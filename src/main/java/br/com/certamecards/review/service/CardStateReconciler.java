@@ -5,10 +5,12 @@ import br.com.certamecards.review.domain.AppliedState;
 import br.com.certamecards.review.domain.IgnoredState;
 import br.com.certamecards.review.domain.StaleState;
 import br.com.certamecards.review.domain.StateIgnoreCode;
+import br.com.certamecards.review.persistence.CardStateLock;
 import br.com.certamecards.review.persistence.CardStateUpsertWriter;
 import br.com.certamecards.review.persistence.ReviewLogRepository;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -16,21 +18,37 @@ public class CardStateReconciler {
 
     private final ReviewLogRepository reviewLogRepository;
     private final CardStateUpsertWriter cardStateUpsertWriter;
+    private final CardStateLock cardStateLock;
 
-    public CardStateReconciler(ReviewLogRepository reviewLogRepository, CardStateUpsertWriter cardStateUpsertWriter) {
+    public CardStateReconciler(
+            ReviewLogRepository reviewLogRepository,
+            CardStateUpsertWriter cardStateUpsertWriter,
+            CardStateLock cardStateLock) {
         this.reviewLogRepository = reviewLogRepository;
         this.cardStateUpsertWriter = cardStateUpsertWriter;
+        this.cardStateLock = cardStateLock;
     }
 
     public StateOutcome reconcile(StateReconciliationRequest request) {
         List<AppliedState> applied = new ArrayList<>();
         List<StaleState> stale = new ArrayList<>();
         List<IgnoredState> ignored = new ArrayList<>();
+        cardStateLock.lockAll(lockableCardIds(request));
         for (CardStatePushInput state : request.states()) {
             StateDecision decision = reconcileOne(state, request);
             collect(decision, applied, stale, ignored);
         }
         return new StateOutcome(applied, stale, ignored);
+    }
+
+    private List<UUID> lockableCardIds(StateReconciliationRequest request) {
+        return request.states().stream()
+                .map(CardStatePushInput::cardId)
+                .filter(cardId -> request.accessibleCards().containsKey(cardId))
+                .filter(cardId -> !request.accessibleCards().get(cardId).isDeleted())
+                .distinct()
+                .sorted()
+                .toList();
     }
 
     private void collect(

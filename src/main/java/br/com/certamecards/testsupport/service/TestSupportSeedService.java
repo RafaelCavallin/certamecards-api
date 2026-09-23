@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TestSupportSeedService {
@@ -44,7 +43,6 @@ public class TestSupportSeedService {
         this.clock = clock;
     }
 
-    @Transactional
     public SeedResult seed(SeedCommand command) {
         Subject subject = subjectLookup.resolveActiveByNameOrFirst(command.subjectName());
         DeckCreationResult deck = createDeck(command, subject.getId());

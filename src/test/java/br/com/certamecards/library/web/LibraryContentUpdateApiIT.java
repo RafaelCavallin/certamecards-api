@@ -125,7 +125,7 @@ class LibraryContentUpdateApiIT extends LibraryApiITBase {
         assertThat(progress.logCount(setup.userId, setup.cardId, "review")).isEqualTo(1);
         assertThat(progress.stateRow(setup.userId, setup.cardId).get("state")).isEqualTo(2);
         JsonNode pull = fixtures.json(fixtures.read(setup.token, "/api/sync/changes?cursor=0"));
-        assertThat(pull.get("cards").toString()).contains("\"deletedAt\":\"");
+        assertThat(pull.get("changes").toString()).contains("\"deletedAt\":\"");
         JsonNode pushed =
                 progress.study(setup.token, setup.cardId, Instant.now().minusSeconds(10), 2);
         assertThat(pushed.get("ignoredStates").get(0).get("reason").asString()).isEqualTo("card_deleted");

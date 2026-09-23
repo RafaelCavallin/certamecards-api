@@ -15,6 +15,7 @@ import br.com.certamecards.library.domain.DeckPreview;
 import br.com.certamecards.library.domain.LibraryDeckSummary;
 import br.com.certamecards.library.domain.PreviewCard;
 import br.com.certamecards.library.persistence.LibraryDeckLookupQuery;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -25,8 +26,13 @@ class DeckPreviewServiceTest {
 
     private final OfficialDeckAccess deckAccess = mock(OfficialDeckAccess.class);
     private final LibraryDeckLookupQuery lookupQuery = mock(LibraryDeckLookupQuery.class);
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final DeckPreviewService service = new DeckPreviewService(
-            deckAccess, new DeckAvailabilityGuard(), lookupQuery, new LibraryProperties(90, 10, 5, 20, 500, 3));
+            deckAccess,
+            new DeckAvailabilityGuard(),
+            lookupQuery,
+            new LibraryProperties(90, 10, 5, 20, 500, 3),
+            new LibraryMetrics(registry));
     private final UUID userId = UUID.randomUUID();
     private final Deck deck =
             new Deck(UUID.randomUUID(), null, UUID.randomUUID(), "CF/88", DeckOrigin.OFFICIAL_SUBSCRIPTION);
@@ -66,5 +72,17 @@ class DeckPreviewServiceTest {
         assertThatThrownBy(() -> service.preview(userId, deck.getId()))
                 .isInstanceOfSatisfying(
                         ApiException.class, ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.NOT_FOUND));
+    }
+
+    @Test
+    void givenPublishedDeck_whenPreviewing_thenCountsThePreview() {
+        deck.getOfficialMeta().changeStatus("published");
+        when(deckAccess.findOfficial(deck.getId())).thenReturn(deck);
+        when(lookupQuery.findSummary(userId, deck.getId()))
+                .thenReturn(Optional.of(org.mockito.Mockito.mock(LibraryDeckSummary.class)));
+
+        service.preview(userId, deck.getId());
+
+        assertThat(registry.counter("library.preview").count()).isEqualTo(1);
     }
 }

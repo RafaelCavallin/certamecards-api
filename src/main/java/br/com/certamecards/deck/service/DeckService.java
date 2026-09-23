@@ -51,7 +51,7 @@ public class DeckService {
                 command.content().name().strip());
         deck.changeDescription(command.content().normalizedDescription());
         deck.getAudit().initialize(clock.instant());
-        return new DeckCreationResult(deckRepository.save(deck), true);
+        return new DeckCreationResult(deckRepository.saveAndFlush(deck), true);
     }
 
     @Transactional
@@ -60,7 +60,7 @@ public class DeckService {
         ensureVersionMatches(deck, command.expectedVersion());
         updateApplier.apply(deck, command);
         deck.touch(clock.instant());
-        return deckRepository.save(deck);
+        return deckRepository.saveAndFlush(deck);
     }
 
     @Transactional

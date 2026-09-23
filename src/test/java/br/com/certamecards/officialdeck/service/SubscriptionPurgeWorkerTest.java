@@ -11,6 +11,7 @@ import br.com.certamecards.officialdeck.domain.PurgeTarget;
 import br.com.certamecards.officialdeck.domain.SubscriptionProgressPolicy;
 import br.com.certamecards.officialdeck.persistence.ProgressPurgeWriter;
 import br.com.certamecards.officialdeck.persistence.PurgeableSubscriptionsQuery;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -26,7 +27,9 @@ class SubscriptionPurgeWorkerTest {
     private final PurgeableSubscriptionsQuery query = mock(PurgeableSubscriptionsQuery.class);
     private final ProgressPurgeWriter writer = mock(ProgressPurgeWriter.class);
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-    private final SubscriptionProgressPurger purger = new SubscriptionProgressPurger(writer, clock);
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    private final SubscriptionProgressPurger purger =
+            new SubscriptionProgressPurger(writer, clock, new OfficialMetrics(registry));
     private final SubscriptionPurgeWorker worker = new SubscriptionPurgeWorker(
             query,
             purger,
@@ -52,5 +55,16 @@ class SubscriptionPurgeWorkerTest {
         when(query.find(Instant.parse("2026-06-21T14:00:00Z"), 500)).thenReturn(List.of());
 
         assertThat(worker.runDailyPurge()).isZero();
+    }
+
+    @Test
+    void givenPurgedSubscription_whenRunningDailyPurge_thenCountsTheResetCards() {
+        PurgeTarget target = new PurgeTarget(UUID.randomUUID(), UUID.randomUUID());
+        when(query.find(Instant.parse("2026-06-21T14:00:00Z"), 500)).thenReturn(List.of(target));
+        when(writer.reset(target, NOW)).thenReturn(12_000);
+
+        worker.runDailyPurge();
+
+        assertThat(registry.counter("subscription.purge.cards").count()).isEqualTo(12_000);
     }
 }

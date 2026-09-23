@@ -15,10 +15,12 @@ public class ReviewLogWriter {
             """
             INSERT INTO review_logs
                 (id, user_id, card_id, kind, rating, reviewed_at, duration_ms,
-                 state_before, state_after, offline, device_id, session_id, received_at)
+                 state_before, state_after, offline, device_id, session_id, received_at,
+                 event_at, event_counter, event_device_id, operation_id)
             VALUES
                 (:id, :userId, :cardId, :kind, :rating, :reviewedAt, :durationMs,
-                 CAST(:stateBefore AS jsonb), CAST(:stateAfter AS jsonb), :offline, :deviceId, :sessionId, :receivedAt)
+                 CAST(:stateBefore AS jsonb), CAST(:stateAfter AS jsonb), :offline, :deviceId, :sessionId, :receivedAt,
+                 :reviewedAt, 0, :deviceId, :id)
             ON CONFLICT (id) DO NOTHING
             """;
 

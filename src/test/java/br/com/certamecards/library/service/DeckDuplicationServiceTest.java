@@ -16,6 +16,7 @@ import br.com.certamecards.library.domain.DuplicationPlan;
 import br.com.certamecards.library.domain.DuplicationSource;
 import br.com.certamecards.library.persistence.DeckCopyWriter;
 import br.com.certamecards.library.persistence.UserCardCountsQuery;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -32,8 +33,15 @@ class DeckDuplicationServiceTest {
     private final DuplicationPlanner planner = mock(DuplicationPlanner.class);
     private final UserCardCountsQuery countsQuery = mock(UserCardCountsQuery.class);
     private final SubscriptionService subscriptionService = mock(SubscriptionService.class);
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final DeckDuplicationService service = new DeckDuplicationService(
-            copyWriter, sourceLoader, planner, countsQuery, subscriptionService, Clock.fixed(NOW, ZoneOffset.UTC));
+            copyWriter,
+            sourceLoader,
+            planner,
+            countsQuery,
+            subscriptionService,
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            new LibraryMetrics(registry));
     private final UUID userId = UUID.randomUUID();
     private final UUID sourceId = UUID.randomUUID();
     private final UUID copyId = UUID.randomUUID();
@@ -84,5 +92,33 @@ class DeckDuplicationServiceTest {
 
     private DuplicateDeckCommand command(boolean carry, boolean cancel) {
         return new DuplicateDeckCommand(userId, sourceId, new DuplicationOptions(copyId, carry, cancel));
+    }
+
+    @Test
+    void givenCreatedCopyAndReplay_whenDuplicating_thenCountsOnlyTheCreation() {
+        stubNewCopy(new DuplicationPlan(true, false));
+
+        service.duplicate(command(true, false));
+        when(copyWriter.findExisting(userId, copyId)).thenReturn(Optional.of(copy));
+        service.duplicate(command(true, false));
+
+        assertThat(registry.counter("library.duplicate", "mode", "carry", "result", "created")
+                        .count())
+                .isEqualTo(1);
+    }
+
+    @Test
+    void givenUserCardLimit_whenDuplicatingFresh_thenCountsLimitRejected() {
+        stubNewCopy(new DuplicationPlan(false, false));
+        when(planner.plan(any(), any(), org.mockito.ArgumentMatchers.eq(100L)))
+                .thenThrow(br.com.certamecards.common.error.ApiException.of(
+                        br.com.certamecards.common.error.ErrorCode.USER_CARD_LIMIT));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.duplicate(command(false, false)))
+                .isInstanceOf(br.com.certamecards.common.error.ApiException.class);
+
+        assertThat(registry.counter("library.duplicate", "mode", "fresh", "result", "limit_rejected")
+                        .count())
+                .isEqualTo(1);
     }
 }

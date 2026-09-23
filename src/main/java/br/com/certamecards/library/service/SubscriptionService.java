@@ -21,28 +21,41 @@ public class SubscriptionService {
     private final DeckSubscriptionStore store;
     private final SubscriberCountUpdater countUpdater;
     private final Clock clock;
+    private final LibraryMetrics metrics;
 
     public SubscriptionService(
             OfficialDeckAccess deckAccess,
             SubscriptionGuard guard,
             DeckSubscriptionStore store,
             SubscriberCountUpdater countUpdater,
-            Clock clock) {
+            Clock clock,
+            LibraryMetrics metrics) {
         this.deckAccess = deckAccess;
         this.guard = guard;
         this.store = store;
         this.countUpdater = countUpdater;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     @Transactional
     public SubscriptionResult subscribe(UUID userId, UUID deckId) {
+        try {
+            return activate(userId, deckId);
+        } catch (ApiException exception) {
+            metrics.subscriptionRejected(exception.getErrorCode());
+            throw exception;
+        }
+    }
+
+    private SubscriptionResult activate(UUID userId, UUID deckId) {
         Deck deck = deckAccess.lockOfficial(deckId);
         Optional<DeckSubscription> previous = store.find(userId, deckId);
         guard.ensureCanSubscribe(userId, deck, previous);
         boolean restoredProgress = previous.isPresent() && store.hasStoredProgress(userId, deckId);
         DeckSubscription subscription = store.activate(userId, deckId, clock.instant());
         countUpdater.increment(deckId);
+        metrics.subscription(previous.isPresent() ? "resubscribed" : "subscribed");
         return new SubscriptionResult(deck, subscription, restoredProgress);
     }
 
@@ -54,5 +67,6 @@ public class SubscriptionService {
         }
         store.cancel(userId, deckId, clock.instant());
         countUpdater.decrement(deckId);
+        metrics.subscription("cancelled");
     }
 }

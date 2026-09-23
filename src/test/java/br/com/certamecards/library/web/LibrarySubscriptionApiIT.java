@@ -56,8 +56,9 @@ class LibrarySubscriptionApiIT extends LibraryApiITBase {
         assertThat(second.get("hasMore").asBoolean()).isFalse();
         assertThat(second.get("nextAfter").isNull()).isTrue();
         assertThat(ids(first, "cards")).doesNotContainAnyElementsOf(ids(second, "cards"));
-        assertThat(pull.get("subscriptions").get(0).get("deckId").asString()).isEqualTo(deckId);
-        assertThat(pull.get("cards")).hasSize(7);
+        assertThat(pullPayloads(pull, "subscription").get(0).get("deckId").asString())
+                .isEqualTo(deckId);
+        assertThat(pullPayloads(pull, "card")).hasSize(7);
     }
 
     @Test
@@ -144,8 +145,8 @@ class LibrarySubscriptionApiIT extends LibraryApiITBase {
         JsonNode content = fixtures.json(fixtures.read(candidate, "/api/library/decks/" + deckId + "/content"));
         assertThat(content.get("cards")).hasSize(6);
         long cursor = lastOwnCardChangeSeq(email);
-        JsonNode pull = fixtures.json(fixtures.read(candidate, "/api/sync/changes?cursor=" + cursor + "&limit=1000"));
-        assertThat(ids(pull, "cards")).containsExactlyInAnyOrderElementsOf(ids(content, "cards"));
+        JsonNode pull = fixtures.json(fixtures.read(candidate, "/api/sync/changes?cursor=" + cursor + "&limit=500"));
+        assertThat(pullIds(pull, "card")).containsExactlyInAnyOrderElementsOf(ids(content, "cards"));
     }
 
     @Test
@@ -164,10 +165,13 @@ class LibrarySubscriptionApiIT extends LibraryApiITBase {
 
         JsonNode suspenderPull = fixtures.json(fixtures.read(suspender, "/api/sync/changes?cursor=0"));
         JsonNode otherPull = fixtures.json(fixtures.read(other, "/api/sync/changes?cursor=0"));
-        assertThat(suspenderPull.get("cardStates")).hasSize(1);
-        assertThat(suspenderPull.get("cardStates").get(0).get("suspended").asBoolean())
+        assertThat(pullPayloads(suspenderPull, "card_state")).hasSize(1);
+        assertThat(pullPayloads(suspenderPull, "card_state")
+                        .get(0)
+                        .get("suspended")
+                        .asBoolean())
                 .isTrue();
-        assertThat(otherPull.get("cardStates")).isEmpty();
+        assertThat(pullPayloads(otherPull, "card_state")).isEmpty();
         mockMvc.perform(put("/api/cards/" + cardId + "/suspension")
                         .header("Authorization", "Bearer " + outsider)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -191,8 +195,9 @@ class LibrarySubscriptionApiIT extends LibraryApiITBase {
         fixtures.read(newcomer, "/api/library/decks/" + deckId + "/preview")
                 .andExpect(status().isUnprocessableEntity());
         JsonNode pull = fixtures.json(fixtures.read(subscriber, "/api/sync/changes?cursor=0"));
-        assertThat(pull.get("decks").get(0).get("officialStatus").asString()).isEqualTo("discontinued");
-        assertThat(pull.get("cards")).hasSize(5);
+        assertThat(pullPayloads(pull, "deck").get(0).get("officialStatus").asString())
+                .isEqualTo("discontinued");
+        assertThat(pullPayloads(pull, "card")).hasSize(5);
         fixtures.read(subscriber, "/api/library/decks/" + deckId + "/content").andExpect(status().isOk());
         fixtures.cancel(subscriber, deckId).andExpect(status().isNoContent());
     }
@@ -216,6 +221,22 @@ class LibrarySubscriptionApiIT extends LibraryApiITBase {
     private List<String> ids(JsonNode node, String field) {
         List<String> ids = new ArrayList<>();
         node.get(field).forEach(item -> ids.add(item.get("id").asString()));
+        return ids;
+    }
+
+    private List<JsonNode> pullPayloads(JsonNode page, String type) {
+        List<JsonNode> payloads = new ArrayList<>();
+        for (JsonNode change : page.get("changes")) {
+            if (type.equals(change.get("type").asString())) {
+                payloads.add(change.get("payload"));
+            }
+        }
+        return payloads;
+    }
+
+    private List<String> pullIds(JsonNode page, String type) {
+        List<String> ids = new ArrayList<>();
+        pullPayloads(page, type).forEach(payload -> ids.add(payload.get("id").asString()));
         return ids;
     }
 

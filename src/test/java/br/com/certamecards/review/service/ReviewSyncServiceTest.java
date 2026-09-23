@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.certamecards.card.domain.Card;
@@ -16,6 +17,7 @@ import br.com.certamecards.review.domain.RejectedReview;
 import br.com.certamecards.review.domain.ReviewPushResult;
 import br.com.certamecards.review.domain.ReviewSyncLimits;
 import br.com.certamecards.review.domain.StaleState;
+import br.com.certamecards.review.persistence.CardStateLock;
 import br.com.certamecards.review.persistence.CardStateUpsertWriter;
 import br.com.certamecards.review.persistence.ContentUpdateNoticeClearer;
 import br.com.certamecards.review.persistence.ReviewLogRepository;
@@ -42,6 +44,7 @@ class ReviewSyncServiceTest {
     private final ReviewLogWriter reviewLogWriter = mock(ReviewLogWriter.class);
     private final ReviewLogRepository reviewLogRepository = mock(ReviewLogRepository.class);
     private final CardStateUpsertWriter cardStateUpsertWriter = mock(CardStateUpsertWriter.class);
+    private final CardStateLock cardStateLock = mock(CardStateLock.class);
     private final ReviewVoidWriter voidWriter = mock(ReviewVoidWriter.class);
     private final ContentUpdateNoticeClearer noticeClearer = mock(ContentUpdateNoticeClearer.class);
     private ReviewSyncService service;
@@ -49,7 +52,8 @@ class ReviewSyncServiceTest {
     @BeforeEach
     void setUp() {
         ReviewWriter reviewWriter = new ReviewWriter(new ReviewLogValidator(), reviewLogWriter, noticeClearer);
-        CardStateReconciler reconciler = new CardStateReconciler(reviewLogRepository, cardStateUpsertWriter);
+        CardStateReconciler reconciler =
+                new CardStateReconciler(reviewLogRepository, cardStateUpsertWriter, cardStateLock);
         var metrics = new ReviewSyncMetricsRecorder(new SimpleMeterRegistry());
         service = new ReviewSyncService(reviewWriter, voidWriter, reconciler, cardAccessResolver, metrics, FIXED_CLOCK);
         when(voidWriter.insertAll(any(), any())).thenReturn(List.of());
@@ -69,6 +73,7 @@ class ReviewSyncServiceTest {
         assertThat(result.appliedStates()).containsExactly(new AppliedState(cardId, 77L));
         assertThat(result.staleStates()).isEmpty();
         assertThat(result.ignoredStates()).isEmpty();
+        verify(cardStateLock).lockAll(List.of(cardId));
     }
 
     @Test

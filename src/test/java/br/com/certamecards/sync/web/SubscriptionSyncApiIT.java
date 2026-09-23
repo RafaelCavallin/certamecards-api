@@ -17,6 +17,8 @@ import jakarta.mail.internet.MimeMessage;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -77,24 +79,34 @@ class SubscriptionSyncApiIT {
 
         JsonNode firstPull = pull(subscriberToken, 0);
 
-        assertThat(containsId(firstPull.get("decks"), deckId)).isTrue();
-        assertThat(containsId(firstPull.get("cards"), cardId)).isTrue();
+        assertThat(containsId(firstPull, "deck", deckId)).isTrue();
+        assertThat(containsId(firstPull, "card", cardId)).isTrue();
         assertThat(subscriptionCancelledAt(firstPull, deckId)).isNull();
 
         pushOwnerReview(ownerToken, cardId);
         JsonNode afterOwnerReview = pull(subscriberToken, 0);
-        assertThat(afterOwnerReview.get("reviewLogs")).isEmpty();
+        assertThat(changesOfType(afterOwnerReview, "review_log")).isEmpty();
 
         cancelSubscription(subscriberId, deckId);
         JsonNode afterCancel = pull(subscriberToken, firstPull.get("nextCursor").asLong());
 
-        assertThat(containsId(afterCancel.get("decks"), deckId)).isFalse();
+        assertThat(containsId(afterCancel, "deck", deckId)).isFalse();
         assertThat(subscriptionCancelledAt(afterCancel, deckId)).isNotNull();
     }
 
-    private boolean containsId(JsonNode nodes, UUID id) {
-        for (JsonNode node : nodes) {
-            if (node.get("id").asString().equals(id.toString())) {
+    private List<JsonNode> changesOfType(JsonNode page, String type) {
+        List<JsonNode> payloads = new ArrayList<>();
+        for (JsonNode change : page.get("changes")) {
+            if (type.equals(change.get("type").asString())) {
+                payloads.add(change.get("payload"));
+            }
+        }
+        return payloads;
+    }
+
+    private boolean containsId(JsonNode page, String type, UUID id) {
+        for (JsonNode payload : changesOfType(page, type)) {
+            if (payload.get("id").asString().equals(id.toString())) {
                 return true;
             }
         }
@@ -102,11 +114,11 @@ class SubscriptionSyncApiIT {
     }
 
     private String subscriptionCancelledAt(JsonNode page, UUID deckId) {
-        for (JsonNode node : page.get("subscriptions")) {
-            if (node.get("deckId").asString().equals(deckId.toString())) {
-                return node.get("cancelledAt").isNull()
+        for (JsonNode payload : changesOfType(page, "subscription")) {
+            if (payload.get("deckId").asString().equals(deckId.toString())) {
+                return payload.get("cancelledAt").isNull()
                         ? null
-                        : node.get("cancelledAt").asString();
+                        : payload.get("cancelledAt").asString();
             }
         }
         return null;

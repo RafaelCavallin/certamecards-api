@@ -77,7 +77,7 @@ class CardServiceTest {
         when(deckService.lockOwned(ownerId, deckId)).thenReturn(deck);
         when(cardRepository.countByDeckIdAndAudit_DeletedAtIsNull(deckId)).thenReturn(0L);
         when(cardRepository.countActiveByOwnerId(ownerId)).thenReturn(0L);
-        when(cardRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(cardRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
         CreateCardCommand command =
                 new CreateCardCommand(cardId, deckId, ownerId, new CardContent("  Frente  ", "  Verso  ", null));
 

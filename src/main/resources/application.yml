@@ -66,6 +66,11 @@ certame:
   official:
     content-update-batch: 500
     content-update-interval: 1s
+  sync:
+    default-page-limit: 500
+    max-batch-operations: 100
+    max-depends-on: 10
+    conflict-retention-days: 30
 
 management:
   endpoints:

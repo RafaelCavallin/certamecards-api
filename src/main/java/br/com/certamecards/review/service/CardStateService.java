@@ -37,7 +37,7 @@ public class CardStateService {
     public CardState setSuspended(UUID userId, UUID cardId, boolean suspended, Instant now) {
         CardState state = findOrCreate(userId, cardId, now);
         state.setSuspended(suspended, now);
-        return cardStateRepository.save(state);
+        return cardStateRepository.saveAndFlush(state);
     }
 
     @Transactional

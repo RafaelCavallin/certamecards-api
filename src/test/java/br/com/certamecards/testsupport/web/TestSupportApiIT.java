@@ -82,9 +82,18 @@ class TestSupportApiIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resetCards").value(3));
 
-        mockMvc.perform(get("/api/sync/changes?cursor=0").header("Authorization", "Bearer " + token))
+        String pullBody = mockMvc.perform(get("/api/sync/changes?cursor=0").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.reviewLogs.length()").value(3));
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        long reviewLogCount = 0;
+        for (var change : objectMapper.readTree(pullBody).get("changes")) {
+            if ("review_log".equals(change.get("type").asString())) {
+                reviewLogCount++;
+            }
+        }
+        assertThat(reviewLogCount).isEqualTo(3);
     }
 
     @Test

@@ -32,4 +32,17 @@ class ContentUpdateWorkerTest {
 
         assertThat(worker.runPendingBatch()).isEqualTo(1);
     }
+
+    @Test
+    void givenFailingBatches_whenRunningRepeatedly_thenSwallowsTheErrorAndKeepsProcessingOthers() {
+        UUID failing = UUID.randomUUID();
+        UUID healthy = UUID.randomUUID();
+        when(jobStore.pendingIds(10)).thenReturn(List.of(failing, healthy));
+        when(applier.applyNextBatch(failing)).thenThrow(new IllegalStateException("db"));
+        when(applier.applyNextBatch(healthy)).thenReturn(true);
+
+        for (int run = 0; run < 3; run++) {
+            assertThat(worker.runPendingBatch()).isEqualTo(1);
+        }
+    }
 }

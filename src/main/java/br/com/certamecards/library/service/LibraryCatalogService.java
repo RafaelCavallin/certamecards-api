@@ -18,18 +18,26 @@ public class LibraryCatalogService {
     private final LibraryCatalogQuery catalogQuery;
     private final LibraryDeckLookupQuery lookupQuery;
     private final SuggestionPicker suggestionPicker;
+    private final LibraryMetrics metrics;
 
     public LibraryCatalogService(
-            LibraryCatalogQuery catalogQuery, LibraryDeckLookupQuery lookupQuery, SuggestionPicker suggestionPicker) {
+            LibraryCatalogQuery catalogQuery,
+            LibraryDeckLookupQuery lookupQuery,
+            SuggestionPicker suggestionPicker,
+            LibraryMetrics metrics) {
         this.catalogQuery = catalogQuery;
         this.lookupQuery = lookupQuery;
         this.suggestionPicker = suggestionPicker;
+        this.metrics = metrics;
     }
 
     public LibraryPage search(LibraryQuery query) {
         List<LibraryDeckSummary> items = catalogQuery.search(query);
+        long total = catalogQuery.count(query);
+        boolean filtered = query.text() != null && !query.text().isBlank() || query.subjectId() != null;
+        metrics.search(filtered, total == 0);
         return new LibraryPage(
-                items, query.pageRequest().page(), query.pageRequest().size(), catalogQuery.count(query));
+                items, query.pageRequest().page(), query.pageRequest().size(), total);
     }
 
     public List<SubjectSummary> subjectsWithContent() {

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import br.com.certamecards.auth.domain.RefreshToken;
+import br.com.certamecards.auth.persistence.RefreshFamilyLock;
 import br.com.certamecards.auth.persistence.RefreshTokenRepository;
 import br.com.certamecards.common.error.ApiException;
 import br.com.certamecards.common.error.ErrorCode;
@@ -33,15 +34,22 @@ class RefreshTokenServiceTest {
             new RefreshCookieProperties("__Host-refresh", Duration.ofDays(30), true);
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
-    private final RefreshTokenService service =
-            new RefreshTokenService(repository, cookieProperties, clock, meterRegistry);
+    private final RefreshFamilyRevoker familyRevoker = mock(RefreshFamilyRevoker.class);
+    private final RefreshFamilyLock familyLock = mock(RefreshFamilyLock.class);
+    private final RefreshTokenIssuer issuer = new RefreshTokenIssuer(repository, cookieProperties, clock);
+    private final RefreshTokenReuseDetector reuseDetector = new RefreshTokenReuseDetector(meterRegistry, familyRevoker);
+    private final RefreshTokenRotationGuard rotationGuard =
+            new RefreshTokenRotationGuard(repository, familyLock, reuseDetector);
+    private final RefreshTokenRevocation revocation = new RefreshTokenRevocation(repository, clock);
+    private final RefreshTokenService service = new RefreshTokenService(issuer, rotationGuard, revocation);
 
     @Test
     void givenValidToken_whenRotating_thenRevokesOldAndSavesNewLinkedByFamily() {
         UUID familyId = UUID.randomUUID();
         RefreshToken current =
                 new RefreshToken(UUID.randomUUID(), USER_ID, familyId, "hash", NOW.plus(Duration.ofDays(1)));
-        when(repository.findByTokenHash(any())).thenReturn(Optional.of(current));
+        when(repository.findFamilyIdByTokenHash(any())).thenReturn(Optional.of(familyId));
+        when(repository.findByTokenHashForUpdate(any())).thenReturn(Optional.of(current));
 
         RotationResult result = service.rotate("raw-token", "agent");
 
@@ -49,6 +57,7 @@ class RefreshTokenServiceTest {
         assertThat(result.newToken().entity().getFamilyId()).isEqualTo(familyId);
         assertThat(current.getRevokedAt()).isEqualTo(NOW);
         assertThat(current.getReplacedBy()).isEqualTo(result.newToken().entity().getId());
+        verify(familyLock).lock(familyId);
         verify(repository, times(2)).save(any());
     }
 
@@ -58,16 +67,14 @@ class RefreshTokenServiceTest {
         RefreshToken revoked =
                 new RefreshToken(UUID.randomUUID(), USER_ID, familyId, "hash", NOW.plus(Duration.ofDays(1)));
         revoked.revoke(NOW.minusSeconds(60));
-        RefreshToken sibling =
-                new RefreshToken(UUID.randomUUID(), USER_ID, familyId, "hash2", NOW.plus(Duration.ofDays(1)));
-        when(repository.findByTokenHash(any())).thenReturn(Optional.of(revoked));
-        when(repository.findByFamilyIdAndRevokedAtIsNull(familyId)).thenReturn(List.of(sibling));
+        when(repository.findFamilyIdByTokenHash(any())).thenReturn(Optional.of(familyId));
+        when(repository.findByTokenHashForUpdate(any())).thenReturn(Optional.of(revoked));
 
         assertThatThrownBy(() -> service.rotate("raw-token", "agent"))
                 .isInstanceOf(ApiException.class)
                 .satisfies(e -> assertThat(((ApiException) e).getErrorCode()).isEqualTo(ErrorCode.UNAUTHENTICATED));
 
-        assertThat(sibling.getRevokedAt()).isEqualTo(NOW);
+        verify(familyRevoker).revoke(familyId, NOW);
         assertThat(meterRegistry.counter("auth.refresh.reuse_detected").count()).isEqualTo(1.0);
     }
 
@@ -75,7 +82,8 @@ class RefreshTokenServiceTest {
     void givenExpiredToken_whenRotating_thenThrowsUnauthenticated() {
         RefreshToken expired =
                 new RefreshToken(UUID.randomUUID(), USER_ID, UUID.randomUUID(), "hash", NOW.minusSeconds(1));
-        when(repository.findByTokenHash(any())).thenReturn(Optional.of(expired));
+        when(repository.findFamilyIdByTokenHash(any())).thenReturn(Optional.of(expired.getFamilyId()));
+        when(repository.findByTokenHashForUpdate(any())).thenReturn(Optional.of(expired));
 
         assertThatThrownBy(() -> service.rotate("raw-token", "agent"))
                 .isInstanceOf(ApiException.class)
@@ -84,7 +92,7 @@ class RefreshTokenServiceTest {
 
     @Test
     void givenUnknownToken_whenRotating_thenThrowsUnauthenticated() {
-        when(repository.findByTokenHash(any())).thenReturn(Optional.empty());
+        when(repository.findFamilyIdByTokenHash(any())).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.rotate("raw-token", "agent"))
                 .isInstanceOf(ApiException.class)

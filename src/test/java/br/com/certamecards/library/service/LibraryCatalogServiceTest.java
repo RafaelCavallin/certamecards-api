@@ -12,6 +12,7 @@ import br.com.certamecards.library.domain.SubjectSummary;
 import br.com.certamecards.library.domain.SuggestionPicker;
 import br.com.certamecards.library.persistence.LibraryCatalogQuery;
 import br.com.certamecards.library.persistence.LibraryDeckLookupQuery;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -21,8 +22,9 @@ class LibraryCatalogServiceTest {
 
     private final LibraryCatalogQuery catalogQuery = mock(LibraryCatalogQuery.class);
     private final LibraryDeckLookupQuery lookupQuery = mock(LibraryDeckLookupQuery.class);
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final LibraryCatalogService service =
-            new LibraryCatalogService(catalogQuery, lookupQuery, new SuggestionPicker());
+            new LibraryCatalogService(catalogQuery, lookupQuery, new SuggestionPicker(), new LibraryMetrics(registry));
     private final UUID userId = UUID.randomUUID();
 
     @Test
@@ -57,5 +59,31 @@ class LibraryCatalogServiceTest {
 
     private LibraryDeckSummary summary(UUID subjectId) {
         return new LibraryDeckSummary(UUID.randomUUID(), subjectId, "Matéria", "Deck", null, 10, Instant.EPOCH, false);
+    }
+
+    @Test
+    void givenFilteredSearchWithoutResults_whenSearching_thenCountsFilteredEmptySearch() {
+        LibraryQuery query = new LibraryQuery(userId, "zzz", null, new LibraryPageRequest(0, 20));
+        when(catalogQuery.search(query)).thenReturn(List.of());
+        when(catalogQuery.count(query)).thenReturn(0L);
+
+        service.search(query);
+
+        assertThat(registry.counter("library.search", "filtered", "true", "empty", "true")
+                        .count())
+                .isEqualTo(1);
+    }
+
+    @Test
+    void givenUnfilteredSearchWithResults_whenSearching_thenCountsUnfilteredNonEmptySearch() {
+        LibraryQuery query = new LibraryQuery(userId, null, null, new LibraryPageRequest(0, 20));
+        when(catalogQuery.search(query)).thenReturn(List.of(summary(UUID.randomUUID())));
+        when(catalogQuery.count(query)).thenReturn(1L);
+
+        service.search(query);
+
+        assertThat(registry.counter("library.search", "filtered", "false", "empty", "false")
+                        .count())
+                .isEqualTo(1);
     }
 }

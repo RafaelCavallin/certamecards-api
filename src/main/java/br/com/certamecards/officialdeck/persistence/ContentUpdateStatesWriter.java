@@ -34,14 +34,17 @@ public class ContentUpdateStatesWriter {
                     content_updated_at = :updatedAt, updated_at = :now
                 FROM locked l WHERE cs.user_id = l.user_id AND cs.card_id = l.card_id RETURNING cs.user_id)
             INSERT INTO review_logs (id, user_id, card_id, kind, rating, reviewed_at, duration_ms,
-                                     state_before, state_after, offline, device_id, received_at)
-            SELECT uuidv7(), l.user_id, l.card_id, 'content_update', NULL, :updatedAt, 0,\s"""
+                                     state_before, state_after, offline, device_id, received_at,
+                                     event_at, event_counter, event_device_id, operation_id)
+            SELECT gen.log_id, l.user_id, l.card_id, 'content_update', NULL, :updatedAt, 0,\s"""
                     + CardStateSnapshotSql.of("l")
                     + ", "
                     + AFTER_SNAPSHOT
                     + ", false, "
                     + SYSTEM_DEVICE_UUID
-                    + ", :now FROM locked l";
+                    + ", :now, :updatedAt, 0, "
+                    + SYSTEM_DEVICE_UUID
+                    + ", gen.log_id FROM locked l CROSS JOIN LATERAL (SELECT uuidv7() AS log_id) gen";
 
     private final JdbcClient jdbcClient;
 

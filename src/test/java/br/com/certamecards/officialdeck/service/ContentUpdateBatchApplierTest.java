@@ -12,6 +12,7 @@ import br.com.certamecards.officialdeck.domain.ContentUpdateJob;
 import br.com.certamecards.officialdeck.persistence.ContentUpdateJobStore;
 import br.com.certamecards.officialdeck.persistence.ContentUpdateStatesWriter;
 import br.com.certamecards.officialdeck.persistence.ContentUpdateSubscribersQuery;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -26,6 +27,7 @@ class ContentUpdateBatchApplierTest {
     private static final Instant NOW = Instant.parse("2026-09-19T14:05:00Z");
     private static final int BATCH = 500;
 
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final ContentUpdateJobStore jobStore = mock(ContentUpdateJobStore.class);
     private final ContentUpdateSubscribersQuery subscribersQuery = mock(ContentUpdateSubscribersQuery.class);
     private final ContentUpdateStatesWriter statesWriter = mock(ContentUpdateStatesWriter.class);
@@ -34,7 +36,8 @@ class ContentUpdateBatchApplierTest {
             subscribersQuery,
             statesWriter,
             new OfficialProperties(BATCH, Duration.ofSeconds(1)),
-            Clock.fixed(NOW, ZoneOffset.UTC));
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            new OfficialMetrics(registry));
     private final UUID cursor = UUID.randomUUID();
     private final ContentUpdateJob job =
             new ContentUpdateJob(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "nota", NOW, cursor);
@@ -84,5 +87,25 @@ class ContentUpdateBatchApplierTest {
                 .lockNextBatch(
                         org.mockito.ArgumentMatchers.argThat(j -> cursor.equals(j.cursorUserId())),
                         org.mockito.ArgumentMatchers.eq(BATCH));
+    }
+
+    @Test
+    void givenBatchThenCompletion_whenApplying_thenCountsAppliedSubscribersAndFinishedLag() {
+        UUID first = UUID.randomUUID();
+        ContentUpdateJob slow =
+                new ContentUpdateJob(job.id(), job.cardId(), job.deckId(), "nota", NOW.minusSeconds(300), cursor);
+        when(jobStore.lockPending(slow.id())).thenReturn(Optional.of(slow));
+        when(subscribersQuery.lockNextBatch(slow, BATCH)).thenReturn(List.of(first), List.of());
+        when(statesWriter.apply(slow, List.of(first), NOW)).thenReturn(1);
+
+        applier.applyNextBatch(slow.id());
+        applier.applyNextBatch(slow.id());
+
+        assertThat(registry.counter("official.content_update.applied").count()).isEqualTo(1);
+        assertThat(registry.counter("official.content_update.jobs", "result", "finished")
+                        .count())
+                .isEqualTo(1);
+        assertThat(registry.summary("official.content_update.lag_seconds").max())
+                .isEqualTo(300);
     }
 }

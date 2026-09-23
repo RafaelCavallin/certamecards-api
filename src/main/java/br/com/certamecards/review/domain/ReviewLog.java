@@ -48,6 +48,18 @@ public class ReviewLog {
     @Column(name = "change_seq", insertable = false, updatable = false)
     private Long changeSeq;
 
+    @Column(name = "event_at", nullable = false)
+    private Instant eventAt;
+
+    @Column(name = "event_counter", nullable = false)
+    private int eventCounter;
+
+    @Column(name = "event_device_id", nullable = false)
+    private UUID eventDeviceId;
+
+    @Column(name = "operation_id", nullable = false)
+    private UUID operationId;
+
     protected ReviewLog() {}
 
     public ReviewLog(
@@ -59,6 +71,10 @@ public class ReviewLog {
         this.reviewedAt = reviewedAt;
         this.stateAfter = stateAfter;
         this.submission = new ReviewSubmission(deviceId);
+        this.eventAt = reviewedAt;
+        this.eventCounter = 0;
+        this.eventDeviceId = deviceId;
+        this.operationId = id;
     }
 
     public UUID getId() {

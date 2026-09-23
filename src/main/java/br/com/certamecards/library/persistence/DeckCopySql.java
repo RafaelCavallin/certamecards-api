@@ -36,12 +36,16 @@ final class DeckCopySql {
                 FROM carried RETURNING card_id),
             ins_logs AS (
                 INSERT INTO review_logs (id, user_id, card_id, kind, rating, reviewed_at, duration_ms,
-                                         state_before, state_after, offline, device_id, received_at)
-                SELECT uuidv7(), :userId, c.new_id, 'duplicate', NULL, :now, 0, NULL,\s"""
+                                         state_before, state_after, offline, device_id, received_at,
+                                         event_at, event_counter, event_device_id, operation_id)
+                SELECT gen.log_id, :userId, c.new_id, 'duplicate', NULL, :now, 0, NULL,\s"""
                     + CardStateSnapshotSql.of("c")
                     + ", false, "
                     + SYSTEM_DEVICE_UUID
-                    + ", :now FROM carried c WHERE c.state <> 0 RETURNING id) "
+                    + ", :now, :now, 0, "
+                    + SYSTEM_DEVICE_UUID
+                    + ", gen.log_id FROM carried c CROSS JOIN LATERAL (SELECT uuidv7() AS log_id) gen"
+                    + " WHERE c.state <> 0 RETURNING id) "
                     + "SELECT (SELECT count(*) FROM ins_cards) AS copied_cards, "
                     + "(SELECT count(*) FROM ins_states) AS carried_states, "
                     + "(SELECT count(*) FROM ins_logs) AS seed_logs";

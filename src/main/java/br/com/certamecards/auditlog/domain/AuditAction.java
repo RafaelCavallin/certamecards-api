@@ -16,7 +16,9 @@ public enum AuditAction {
     OFFICIAL_CARD_CREATED("official_card_created"),
     OFFICIAL_CARD_UPDATED("official_card_updated"),
     OFFICIAL_CARD_CONTENT_CHANGED("official_card_content_changed"),
-    OFFICIAL_CARD_DELETED("official_card_deleted");
+    OFFICIAL_CARD_DELETED("official_card_deleted"),
+    ERROR_REPORT_RESOLVED("error_report_resolved"),
+    ERROR_REPORT_REJECTED("error_report_rejected");
 
     private final String code;
 

@@ -33,14 +33,18 @@ public class ProgressPurgeWriter {
                     content_update_note = NULL, content_updated_at = NULL, updated_at = :now
                 FROM targets t WHERE cs.user_id = t.user_id AND cs.card_id = t.card_id RETURNING cs.card_id)
             INSERT INTO review_logs (id, user_id, card_id, kind, rating, reviewed_at, duration_ms,
-                                     state_before, state_after, offline, device_id, received_at)
-            SELECT uuidv7(), t.user_id, t.card_id, 'reset', NULL, :now, 0,\s"""
+                                     state_before, state_after, offline, device_id, received_at,
+                                     event_at, event_counter, event_device_id, operation_id)
+            SELECT gen.log_id, t.user_id, t.card_id, 'reset', NULL, :now, 0,\s"""
                     + CardStateSnapshotSql.of("t")
                     + ", "
                     + NEW_SNAPSHOT
                     + ", false, "
                     + SYSTEM_DEVICE_UUID
-                    + ", :now FROM targets t WHERE t.state <> 0";
+                    + ", :now, :now, 0, "
+                    + SYSTEM_DEVICE_UUID
+                    + ", gen.log_id FROM targets t CROSS JOIN LATERAL (SELECT uuidv7() AS log_id) gen"
+                    + " WHERE t.state <> 0";
     private static final String MARK_PURGED_SQL =
             "UPDATE deck_subscriptions SET progress_purged_at = :now WHERE user_id = :userId AND deck_id = :deckId";
 

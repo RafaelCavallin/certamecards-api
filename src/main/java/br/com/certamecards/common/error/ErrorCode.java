@@ -28,9 +28,16 @@ public enum ErrorCode {
     ALREADY_SUBSCRIBED(HttpStatus.CONFLICT, "Já inscrito", "Você já está inscrito neste deck."),
     NOT_SUBSCRIBED(HttpStatus.CONFLICT, "Sem inscrição", "Você não está inscrito neste deck."),
     USER_CARD_LIMIT(HttpStatus.UNPROCESSABLE_ENTITY, "Limite de cartões", "Você chegou a 50.000 cartões."),
+    REPORT_ALREADY_SENT(
+            HttpStatus.CONFLICT, "Erro já apontado", "Você já apontou um erro neste cartão. Vamos analisar."),
+    REPORT_ALREADY_CLOSED(HttpStatus.CONFLICT, "Apontamento encerrado", "Este apontamento já foi encerrado."),
     TOKEN_EXPIRED(HttpStatus.GONE, "Link expirado", "Peça um novo link."),
     TOKEN_USED(HttpStatus.GONE, "Link já usado", "Peça um novo link."),
     RESYNC_REQUIRED(HttpStatus.GONE, "Sincronização completa necessária", "Refaça a sincronização desde o início."),
+    OPERATION_ID_REUSED(
+            HttpStatus.CONFLICT,
+            "Identificador de operação reutilizado",
+            "Esta operação já foi enviada com um conteúdo diferente."),
     LOGIN_LOCKED(HttpStatus.TOO_MANY_REQUESTS, "Muitas tentativas", "Aguarde para tentar de novo."),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Limite de requisições", "Aguarde e tente de novo."),
     ORIGIN_REJECTED(HttpStatus.FORBIDDEN, "Origem rejeitada", "Requisição de origem não permitida.");

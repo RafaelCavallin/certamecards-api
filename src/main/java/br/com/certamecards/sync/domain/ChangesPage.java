@@ -1,15 +1,6 @@
 package br.com.certamecards.sync.domain;
 
+import java.time.Instant;
 import java.util.List;
 
-public record ChangesPage(
-        List<SubjectChange> subjects,
-        List<DeckChange> decks,
-        List<CardChange> cards,
-        List<CardStateChange> cardStates,
-        List<ReviewLogChange> reviewLogs,
-        List<ReviewVoidChange> reviewVoids,
-        List<DeckSubscriptionChange> subscriptions,
-        SettingsChange settings,
-        long nextCursor,
-        boolean hasMore) {}
+public record ChangesPage(Instant serverTime, List<ChangeEntry> changes, long nextCursor, boolean hasMore) {}

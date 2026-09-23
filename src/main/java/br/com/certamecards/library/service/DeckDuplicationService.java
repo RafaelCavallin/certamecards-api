@@ -1,5 +1,6 @@
 package br.com.certamecards.library.service;
 
+import br.com.certamecards.common.error.ApiException;
 import br.com.certamecards.deck.domain.Deck;
 import br.com.certamecards.library.domain.DeckCopyRequest;
 import br.com.certamecards.library.domain.DuplicateDeckCommand;
@@ -23,6 +24,7 @@ public class DeckDuplicationService {
     private final UserCardCountsQuery cardCountsQuery;
     private final SubscriptionService subscriptionService;
     private final Clock clock;
+    private final LibraryMetrics metrics;
 
     public DeckDuplicationService(
             DeckCopyWriter copyWriter,
@@ -30,17 +32,33 @@ public class DeckDuplicationService {
             DuplicationPlanner planner,
             UserCardCountsQuery cardCountsQuery,
             SubscriptionService subscriptionService,
-            Clock clock) {
+            Clock clock,
+            LibraryMetrics metrics) {
         this.copyWriter = copyWriter;
         this.sourceLoader = sourceLoader;
         this.planner = planner;
         this.cardCountsQuery = cardCountsQuery;
         this.subscriptionService = subscriptionService;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     @Transactional
     public DuplicationResult duplicate(DuplicateDeckCommand command) {
+        boolean carry = command.options().carryProgress();
+        try {
+            DuplicationResult result = copy(command);
+            if (result.created()) {
+                metrics.duplicate(carry, "created");
+            }
+            return result;
+        } catch (ApiException exception) {
+            metrics.duplicateRejected(carry, exception.getErrorCode());
+            throw exception;
+        }
+    }
+
+    private DuplicationResult copy(DuplicateDeckCommand command) {
         UUID userId = command.userId();
         Optional<Deck> existing =
                 copyWriter.findExisting(userId, command.options().newDeckId());

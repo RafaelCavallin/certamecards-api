@@ -9,7 +9,14 @@ public enum ProductEventName {
     REVIEW_UNDONE("review_undone"),
     PWA_INSTALLED("pwa_installed"),
     SYNC_FLUSHED("sync_flushed"),
-    CLIENT_ERROR("client_error");
+    CLIENT_ERROR("client_error"),
+    LIBRARY_OPENED("library_opened"),
+    LIBRARY_SEARCHED("library_searched"),
+    DECK_PREVIEW_OPENED("deck_preview_opened"),
+    DECK_SUBSCRIBED("deck_subscribed"),
+    DECK_UNSUBSCRIBED("deck_unsubscribed"),
+    DECK_DUPLICATED("deck_duplicated"),
+    CARD_ERROR_REPORTED("card_error_reported");
 
     private final String code;
 

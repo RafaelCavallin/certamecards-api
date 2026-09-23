@@ -5,6 +5,8 @@ import br.com.certamecards.common.error.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -13,6 +15,9 @@ import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class ApiAccessDeniedHandler implements AccessDeniedHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(ApiAccessDeniedHandler.class);
+    private static final String OFFICIAL_ADMIN_PREFIX = "/api/admin/official-";
 
     private final ObjectMapper objectMapper;
 
@@ -23,9 +28,17 @@ public class ApiAccessDeniedHandler implements AccessDeniedHandler {
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException ex)
             throws IOException {
+        if (isOfficialWrite(request)) {
+            log.warn("Non-admin user attempted {} on official content", request.getMethod());
+        }
         ApiError body = ApiError.of(ErrorCode.FORBIDDEN, ErrorCode.FORBIDDEN.detail(), null, null);
         response.setStatus(ErrorCode.FORBIDDEN.status().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.getWriter().write(objectMapper.writeValueAsString(body));
+    }
+
+    private boolean isOfficialWrite(HttpServletRequest request) {
+        boolean write = !"GET".equals(request.getMethod());
+        return write && request.getRequestURI().startsWith(OFFICIAL_ADMIN_PREFIX);
     }
 }

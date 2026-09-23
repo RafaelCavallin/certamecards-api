@@ -1,5 +1,6 @@
 package br.com.certamecards.sync.web;
 
+import br.com.certamecards.common.config.SyncProperties;
 import br.com.certamecards.common.security.AuthenticatedUser;
 import br.com.certamecards.sync.domain.ChangesPage;
 import br.com.certamecards.sync.domain.SyncLimits;
@@ -17,19 +18,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class SyncController {
 
     private final SyncChangesService syncChangesService;
+    private final SyncProperties properties;
 
-    public SyncController(SyncChangesService syncChangesService) {
+    public SyncController(SyncChangesService syncChangesService, SyncProperties properties) {
         this.syncChangesService = syncChangesService;
+        this.properties = properties;
     }
 
     @GetMapping("/api/sync/changes")
     public ChangesPage changes(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @RequestParam(defaultValue = "0") @Min(0) long cursor,
-            @RequestParam(defaultValue = "" + SyncLimits.DEFAULT_PAGE_LIMIT)
-                    @Min(SyncLimits.MIN_PAGE_LIMIT)
-                    @Max(SyncLimits.MAX_PAGE_LIMIT)
-                    int limit) {
-        return syncChangesService.changesSince(principal.id(), cursor, limit);
+            @RequestParam(required = false) @Min(SyncLimits.MIN_PAGE_LIMIT) @Max(SyncLimits.MAX_PAGE_LIMIT)
+                    Integer limit) {
+        int effectiveLimit = limit == null ? properties.defaultPageLimit() : limit;
+        return syncChangesService.changesSince(principal.id(), cursor, effectiveLimit);
     }
 }

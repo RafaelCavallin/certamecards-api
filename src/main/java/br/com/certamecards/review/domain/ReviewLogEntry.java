@@ -16,4 +16,8 @@ public record ReviewLogEntry(
         boolean offline,
         UUID deviceId,
         UUID sessionId,
-        long changeSeq) {}
+        long changeSeq,
+        Instant eventAt,
+        int eventCounter,
+        UUID eventDeviceId,
+        UUID operationId) {}

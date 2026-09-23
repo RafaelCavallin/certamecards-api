@@ -34,7 +34,7 @@ class CardStateServiceTest {
         UUID cardId = UUID.randomUUID();
         when(cardStateRepository.findByIdUserIdAndIdCardId(userId, cardId)).thenReturn(Optional.empty());
         when(reviewLogRepository.countAcceptedByCardIdAndUserId(cardId, userId)).thenReturn(3L);
-        when(cardStateRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(cardStateRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
 
         CardState state = service.setSuspended(userId, cardId, true, FIXED_NOW);
 
@@ -52,7 +52,7 @@ class CardStateServiceTest {
                 3,
                 FIXED_NOW);
         when(cardStateRepository.findByIdUserIdAndIdCardId(userId, cardId)).thenReturn(Optional.of(existing));
-        when(cardStateRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(cardStateRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
 
         CardState result = service.setSuspended(userId, cardId, true, FIXED_NOW.plusSeconds(60));
 
