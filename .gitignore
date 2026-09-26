@@ -5,3 +5,6 @@ target/
 .env
 *.log
 .DS_Store
+
+# Overrides locais do Docker Compose (ex.: porta 80 ocupada nesta máquina)
+compose.*override*.yaml
