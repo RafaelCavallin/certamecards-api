@@ -2,6 +2,7 @@ package br.com.certamecards.admin.service;
 
 import br.com.certamecards.common.error.ApiException;
 import br.com.certamecards.common.error.ErrorCode;
+import br.com.certamecards.common.security.UserAuthCache;
 import br.com.certamecards.user.domain.User;
 import br.com.certamecards.user.domain.UserRole;
 import br.com.certamecards.user.persistence.UserRepository;
@@ -16,10 +17,12 @@ public class AdminService {
 
     private final UserRepository userRepository;
     private final AdminAuditRecorder auditRecorder;
+    private final UserAuthCache userAuthCache;
 
-    public AdminService(UserRepository userRepository, AdminAuditRecorder auditRecorder) {
+    public AdminService(UserRepository userRepository, AdminAuditRecorder auditRecorder, UserAuthCache userAuthCache) {
         this.userRepository = userRepository;
         this.auditRecorder = auditRecorder;
+        this.userAuthCache = userAuthCache;
     }
 
     public List<User> listAdmins() {
@@ -34,6 +37,7 @@ public class AdminService {
             user.promoteToAdmin();
             userRepository.save(user);
             auditRecorder.recordGranted(actorId, user);
+            userAuthCache.evictAfterCommit(user.getId());
         }
         return user;
     }
@@ -45,6 +49,7 @@ public class AdminService {
         user.demoteToCandidate();
         userRepository.save(user);
         auditRecorder.recordRevoked(actorId, user);
+        userAuthCache.evictAfterCommit(user.getId());
     }
 
     private void ensureNotLastAdmin(User user) {

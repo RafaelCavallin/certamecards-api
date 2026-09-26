@@ -5,6 +5,7 @@ import br.com.certamecards.testsupport.domain.SeedScenario;
 import br.com.certamecards.testsupport.service.SeedCommand;
 import br.com.certamecards.testsupport.service.TestSupportOfficialSeeder;
 import br.com.certamecards.testsupport.service.TestSupportSeedService;
+import br.com.certamecards.testsupport.service.TestSupportSessionRevoker;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
@@ -20,10 +21,15 @@ public class TestSupportController {
 
     private final TestSupportSeedService seedService;
     private final TestSupportOfficialSeeder officialSeeder;
+    private final TestSupportSessionRevoker sessionRevoker;
 
-    public TestSupportController(TestSupportSeedService seedService, TestSupportOfficialSeeder officialSeeder) {
+    public TestSupportController(
+            TestSupportSeedService seedService,
+            TestSupportOfficialSeeder officialSeeder,
+            TestSupportSessionRevoker sessionRevoker) {
         this.seedService = seedService;
         this.officialSeeder = officialSeeder;
+        this.sessionRevoker = sessionRevoker;
     }
 
     @PostMapping("/api/test-support/seed")
@@ -34,5 +40,11 @@ public class TestSupportController {
         SeedCommand command =
                 new SeedCommand(principal.id(), scenario, request.countOrDefault(), request.subjectName());
         return SeedResponse.from(scenario.official() ? officialSeeder.seed(command) : seedService.seed(command));
+    }
+
+    @PostMapping("/api/test-support/revoke-sessions")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void revokeSessions(@AuthenticationPrincipal AuthenticatedUser principal) {
+        sessionRevoker.revokeAll(principal.id());
     }
 }

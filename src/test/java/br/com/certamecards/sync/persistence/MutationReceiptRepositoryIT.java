@@ -2,8 +2,8 @@ package br.com.certamecards.sync.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import br.com.certamecards.common.sync.EventOrder;
 import br.com.certamecards.support.PostgresContainerSupport;
-import br.com.certamecards.sync.domain.EventOrder;
 import br.com.certamecards.sync.domain.MutationReceipt;
 import java.time.Instant;
 import java.util.Optional;

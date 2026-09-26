@@ -53,6 +53,10 @@ public class Card {
         this.type = CardType.BASIC;
     }
 
+    public void moveToDeck(UUID deckId) {
+        this.deckId = deckId;
+    }
+
     public void editContent(String front, String back, String source) {
         this.front = front;
         this.back = back;

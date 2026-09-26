@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -75,6 +76,7 @@ class SyncApiIT {
     private JavaMailSender mailSender;
 
     @Test
+    @DisplayName("TI-08 — renomear e desativar matéria reflete no pull")
     void givenSubjectRenamedAndDeactivated_whenPulling_thenChangeIsReflected() throws Exception {
         String candidateToken = registerConfirmAndLogin("vera.candidata@exemplo.com", "Vera");
         String adminToken = registerConfirmLoginAndPromote("aldo.admin@exemplo.com", "Aldo");
@@ -175,6 +177,7 @@ class SyncApiIT {
     }
 
     @Test
+    @DisplayName("TI-20 — cursor fora da janela de purga")
     @DirtiesContext
     void givenCursorBeforePurgeWatermark_whenPulling_thenResyncRequired() throws Exception {
         String token = registerConfirmAndLogin("nando.candidato@exemplo.com", "Nando");

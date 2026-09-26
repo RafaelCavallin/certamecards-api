@@ -5,22 +5,38 @@ import br.com.certamecards.card.service.CardContent;
 import br.com.certamecards.card.service.CardService;
 import br.com.certamecards.card.service.CreateCardCommand;
 import br.com.certamecards.card.service.UpdateCardCommand;
-import br.com.certamecards.sync.domain.EventOrder;
+import br.com.certamecards.common.error.ApiException;
+import br.com.certamecards.common.sync.EventOrder;
 import br.com.certamecards.sync.domain.MutationOutcome;
 import br.com.certamecards.sync.domain.MutationResult;
 import br.com.certamecards.sync.domain.SyncMutationOperation;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class CardMutationHandler implements SyncMutationHandler {
 
     private final CardService cardService;
     private final MutationPayloadReader payloadReader;
+    private final ObjectMapper objectMapper;
 
-    public CardMutationHandler(CardService cardService, MutationPayloadReader payloadReader) {
+    public CardMutationHandler(
+            CardService cardService, MutationPayloadReader payloadReader, ObjectMapper objectMapper) {
         this.cardService = cardService;
         this.payloadReader = payloadReader;
+        this.objectMapper = objectMapper;
+    }
+
+    @Override
+    public String currentSnapshot(UUID userId, UUID entityId) {
+        try {
+            Card card = cardService.findOwned(userId, entityId);
+            return objectMapper.writeValueAsString(
+                    new CardMutationPayload(card.getFront(), card.getBack(), card.getSource(), null));
+        } catch (ApiException exception) {
+            return "{}";
+        }
     }
 
     @Override

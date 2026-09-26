@@ -154,11 +154,13 @@ class SubscriptionSyncApiIT {
         String stateJson = "{\"state\":2,\"stability\":4.2,\"difficulty\":5.1,\"due\":\"2026-09-21T12:10:00Z\","
                 + "\"lastReview\":\"2026-09-17T12:10:00Z\",\"reps\":3,\"lapses\":0,"
                 + "\"learningSteps\":0,\"scheduledDays\":4}";
+        Instant reviewedAt = Instant.now().minusSeconds(30);
         String body = "{\"deviceId\":\"" + UUID.randomUUID() + "\",\"reviews\":[{\"id\":\"" + UUID.randomUUID()
-                + "\",\"cardId\":\"" + cardId + "\",\"kind\":\"review\",\"rating\":3,\"reviewedAt\":\""
-                + Instant.now().minusSeconds(30) + "\",\"durationMs\":4000,\"stateBefore\":null,\"stateAfter\":"
-                + stateJson + ",\"offline\":true,\"deviceId\":\"" + UUID.randomUUID()
-                + "\",\"sessionId\":null}],\"voids\":[],\"states\":[]}";
+                + "\",\"cardId\":\"" + cardId + "\",\"kind\":\"review\",\"rating\":3,\"reviewedAt\":\"" + reviewedAt
+                + "\",\"durationMs\":4000,\"stateBefore\":null,\"stateAfter\":" + stateJson
+                + ",\"offline\":true,\"deviceId\":\"" + UUID.randomUUID() + "\",\"sessionId\":null,"
+                + "\"clock\":{\"wallTime\":\"" + reviewedAt + "\",\"logicalCounter\":0},"
+                + "\"observedServerTime\":\"" + reviewedAt + "\"}],\"voids\":[],\"states\":[]}";
         mockMvc.perform(post("/api/sync/reviews")
                         .header("Authorization", "Bearer " + ownerToken)
                         .contentType(MediaType.APPLICATION_JSON)

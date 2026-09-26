@@ -33,9 +33,10 @@ public class SyncPurgeService {
         long maxChangeSeq = purgeQuery.maxPurgeableChangeSeq(threshold);
         int purgedCards = purgeQuery.purgeCards(threshold);
         int purgedDecks = purgeQuery.purgeDecks(threshold);
+        int purgedConflicts = purgeQuery.purgeConflicts(threshold);
         if (maxChangeSeq > 0) {
             watermarkQuery.advanceWatermark(maxChangeSeq);
         }
-        return new PurgeResult(purgedCards, purgedDecks);
+        return new PurgeResult(purgedCards, purgedDecks, purgedConflicts);
     }
 }

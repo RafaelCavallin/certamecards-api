@@ -64,6 +64,14 @@ public class DeckService {
     }
 
     @Transactional
+    public Deck restore(UUID ownerId, UUID deckId, UpdateDeckCommand command) {
+        Deck deck = findOwned(ownerId, deckId);
+        updateApplier.apply(deck, command);
+        deck.getAudit().restore(clock.instant());
+        return deckRepository.saveAndFlush(deck);
+    }
+
+    @Transactional
     public void delete(UUID ownerId, UUID deckId, int expectedVersion) {
         Deck deck = findOwned(ownerId, deckId);
         ensureVersionMatches(deck, expectedVersion);

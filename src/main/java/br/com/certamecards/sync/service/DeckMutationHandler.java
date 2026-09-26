@@ -1,26 +1,43 @@
 package br.com.certamecards.sync.service;
 
+import br.com.certamecards.common.error.ApiException;
+import br.com.certamecards.common.error.ErrorCode;
+import br.com.certamecards.common.sync.EventOrder;
 import br.com.certamecards.deck.domain.Deck;
 import br.com.certamecards.deck.service.CreateDeckCommand;
 import br.com.certamecards.deck.service.DeckContent;
 import br.com.certamecards.deck.service.DeckService;
 import br.com.certamecards.deck.service.UpdateDeckCommand;
-import br.com.certamecards.sync.domain.EventOrder;
 import br.com.certamecards.sync.domain.MutationOutcome;
 import br.com.certamecards.sync.domain.MutationResult;
 import br.com.certamecards.sync.domain.SyncMutationOperation;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class DeckMutationHandler implements SyncMutationHandler {
 
     private final DeckService deckService;
     private final MutationPayloadReader payloadReader;
+    private final ObjectMapper objectMapper;
 
-    public DeckMutationHandler(DeckService deckService, MutationPayloadReader payloadReader) {
+    public DeckMutationHandler(
+            DeckService deckService, MutationPayloadReader payloadReader, ObjectMapper objectMapper) {
         this.deckService = deckService;
         this.payloadReader = payloadReader;
+        this.objectMapper = objectMapper;
+    }
+
+    @Override
+    public String currentSnapshot(UUID userId, UUID entityId) {
+        try {
+            Deck deck = deckService.findOwned(userId, entityId);
+            return objectMapper.writeValueAsString(
+                    new DeckMutationPayload(deck.getSubjectId(), deck.getName(), deck.getDescription()));
+        } catch (ApiException exception) {
+            return "{}";
+        }
     }
 
     @Override
@@ -36,6 +53,9 @@ public class DeckMutationHandler implements SyncMutationHandler {
 
     private MutationResult create(UUID userId, SyncMutationOperation operation, EventOrder order) {
         DeckMutationPayload payload = payloadReader.deck(operation);
+        if (payload.subjectId() == null) {
+            throw ApiException.of(ErrorCode.VALIDATION_FAILED);
+        }
         Deck deck = deckService
                 .create(new CreateDeckCommand(
                         operation.entityId(),

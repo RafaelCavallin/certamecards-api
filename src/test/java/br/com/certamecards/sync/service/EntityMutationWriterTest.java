@@ -11,8 +11,8 @@ import static org.mockito.Mockito.when;
 
 import br.com.certamecards.common.error.ApiException;
 import br.com.certamecards.common.error.ErrorCode;
-import br.com.certamecards.sync.domain.EventClock;
-import br.com.certamecards.sync.domain.EventOrder;
+import br.com.certamecards.common.sync.EventClock;
+import br.com.certamecards.common.sync.EventOrder;
 import br.com.certamecards.sync.domain.MutationOutcome;
 import br.com.certamecards.sync.domain.MutationReceipt;
 import br.com.certamecards.sync.domain.MutationResult;
@@ -24,6 +24,7 @@ import br.com.certamecards.sync.persistence.SyncEntityHeadRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.node.JsonNodeFactory;
 
@@ -34,8 +35,9 @@ class EntityMutationWriterTest {
     private static final UUID DEVICE_ID = UUID.randomUUID();
     private final SyncEntityHeadRepository heads = mock(SyncEntityHeadRepository.class);
     private final SyncConflictWriter conflicts = mock(SyncConflictWriter.class);
+    private final EntityConflictRegistrar conflictRegistrar = new EntityConflictRegistrar(conflicts);
     private final MutationReceiptService receipts = mock(MutationReceiptService.class);
-    private final EntityMutationWriter writer = new EntityMutationWriter(heads, conflicts, receipts);
+    private final EntityMutationWriter writer = new EntityMutationWriter(heads, conflictRegistrar, receipts);
 
     @Test
     void givenNewDeck_whenAttempting_thenAppliesAndPersistsHeadAndReceipt() {
@@ -57,12 +59,13 @@ class EntityMutationWriterTest {
         EventOrder order = order(operation.operationId(), 1);
         SyncEntityHead existing = head(operation, new EventOrder(NOW, 2, DEVICE_ID, winner), false);
         when(heads.lock(USER_ID, "deck", operation.entityId(), null)).thenReturn(existing);
-        when(conflicts.write(any(), any(), any(), any(), any(), any(), any())).thenReturn(UUID.randomUUID());
+        when(conflicts.write(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(UUID.randomUUID());
 
         MutationResult result = writer.attempt(command(operation, order));
 
         assertThat(result.outcome()).isEqualTo(MutationOutcome.CONFLICT);
-        verify(conflicts).write(any(), any(), any(), any(), any(), any(), any());
+        verify(conflicts).write(any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -100,7 +103,7 @@ class EntityMutationWriterTest {
     }
 
     @Test
-    void givenDeleteWithOlderOrder_whenAttempting_thenDeleteStillWins() {
+    void givenDeleteWithOlderOrder_whenAttempting_thenDeleteStillWinsAndPreservesEditAsConflict() {
         SyncMutationOperation operation = operation(UUID.randomUUID(), SyncOperationKind.DECK_DELETE);
         EventOrder olderOrder = order(operation.operationId(), 1);
         SyncEntityHead existing = head(operation, new EventOrder(NOW, 9, DEVICE_ID, UUID.randomUUID()), false);
@@ -110,33 +113,86 @@ class EntityMutationWriterTest {
 
         assertThat(result.outcome()).isEqualTo(MutationOutcome.APPLIED);
         verify(heads).deleteChildren(any(), any(), any());
+        verify(conflicts)
+                .write(
+                        eq(USER_ID),
+                        eq("deck"),
+                        eq(operation.entityId()),
+                        any(),
+                        eq(existing.winningOperationId()),
+                        eq(operation.operationId()),
+                        eq(br.com.certamecards.sync.domain.ConflictReason.DELETE_WINS),
+                        any(),
+                        any());
     }
 
     @Test
-    void givenNewerNonCausalEdit_whenAttempting_thenApplies() {
+    void givenNewerNonCausalEdit_whenAttempting_thenAppliesAndPreservesPreviousEditAsConflict() {
         SyncMutationOperation operation = operation(UUID.randomUUID());
         EventOrder newerOrder = order(operation.operationId(), 9);
-        SyncEntityHead existing = head(operation, new EventOrder(NOW, 1, DEVICE_ID, UUID.randomUUID()), false);
+        UUID previousWinner = UUID.randomUUID();
+        SyncEntityHead existing = head(operation, new EventOrder(NOW, 1, DEVICE_ID, previousWinner), false);
         when(heads.lock(USER_ID, "deck", operation.entityId(), null)).thenReturn(existing);
 
         MutationResult result = writer.attempt(command(operation, newerOrder));
 
         assertThat(result.outcome()).isEqualTo(MutationOutcome.APPLIED);
+        verify(conflicts)
+                .write(
+                        eq(USER_ID),
+                        eq("deck"),
+                        eq(operation.entityId()),
+                        any(),
+                        eq(previousWinner),
+                        eq(operation.operationId()),
+                        eq(br.com.certamecards.sync.domain.ConflictReason.CONCURRENT_EDIT),
+                        any(),
+                        any());
     }
 
     @Test
-    void givenDeletedEntityAndNonRestoreOperation_whenAttempting_thenRejectsAsEntityDeleted() {
-        SyncMutationOperation operation = operation(UUID.randomUUID());
+    @DisplayName("TU-58 — edição que chega depois da exclusão vira conflito recuperável, sem reaplicar")
+    void givenDeletedEntityAndEditArrivingLater_whenAttempting_thenPreservesEditAsDeleteWinsConflict() {
+        SyncMutationOperation operation = operation(UUID.randomUUID(), SyncOperationKind.DECK_UPDATE);
         EventOrder order = order(operation.operationId(), 1);
         UUID winner = UUID.randomUUID();
+        UUID conflictId = UUID.randomUUID();
         SyncEntityHead existing = head(operation, new EventOrder(NOW, 9, DEVICE_ID, winner), true);
+        when(heads.lock(USER_ID, "deck", operation.entityId(), null)).thenReturn(existing);
+        when(conflicts.write(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(conflictId);
+
+        MutationResult result = writer.attempt(command(operation, order));
+
+        assertThat(result.outcome()).isEqualTo(MutationOutcome.CONFLICT);
+        assertThat(result.conflictId()).isEqualTo(conflictId);
+        verify(conflicts)
+                .write(
+                        eq(USER_ID),
+                        eq("deck"),
+                        eq(operation.entityId()),
+                        any(),
+                        eq(operation.operationId()),
+                        eq(winner),
+                        eq(br.com.certamecards.sync.domain.ConflictReason.DELETE_WINS),
+                        any(),
+                        any());
+        verify(heads, never()).save(any());
+    }
+
+    @Test
+    void givenDeletedEntityAndSecondDelete_whenAttempting_thenAppliesWithoutChangesOrConflict() {
+        SyncMutationOperation operation = operation(UUID.randomUUID(), SyncOperationKind.DECK_DELETE);
+        EventOrder order = order(operation.operationId(), 1);
+        SyncEntityHead existing = head(operation, new EventOrder(NOW, 9, DEVICE_ID, UUID.randomUUID()), true);
         when(heads.lock(USER_ID, "deck", operation.entityId(), null)).thenReturn(existing);
 
         MutationResult result = writer.attempt(command(operation, order));
 
-        assertThat(result.outcome()).isEqualTo(MutationOutcome.ACTION_REQUIRED);
-        assertThat(result.error().code()).isEqualTo("entity_deleted");
+        assertThat(result.outcome()).isEqualTo(MutationOutcome.APPLIED);
+        assertThat(result.error()).isNull();
         verify(heads, never()).save(any());
+        verify(conflicts, never()).write(any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -176,7 +232,8 @@ class EntityMutationWriterTest {
                 new EventOrder(NOW, 1, DEVICE_ID, UUID.randomUUID()),
                 true);
         when(heads.lock(USER_ID, "deck", parentId, null)).thenReturn(deletedParent);
-        when(conflicts.write(any(), any(), any(), any(), any(), any(), any())).thenReturn(UUID.randomUUID());
+        when(conflicts.write(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(UUID.randomUUID());
 
         MutationResult result = writer.attempt(command(operation, order));
 
@@ -197,6 +254,8 @@ class EntityMutationWriterTest {
     }
 
     @Test
+    @DisplayName(
+            "TU-63 — recibo de recusa repete a recusa, nunca vira duplicate (evita dar a operação por sincronizada)")
     void givenExistingReceiptWithErrorCode_whenBuildingDuplicate_thenIncludesError() {
         SyncMutationOperation operation = operation(UUID.randomUUID());
         EventOrder order = order(operation.operationId(), 1);
@@ -215,6 +274,7 @@ class EntityMutationWriterTest {
 
         MutationResult result = writer.duplicate(receipt, "hash");
 
+        assertThat(result.outcome()).isEqualTo(MutationOutcome.ACTION_REQUIRED);
         assertThat(result.error().code()).isEqualTo("validation_failed");
     }
 
@@ -246,13 +306,32 @@ class EntityMutationWriterTest {
                 new EventOrder(NOW, 9, DEVICE_ID, deleteOperationId),
                 true);
         when(heads.lock(USER_ID, "card", operation.entityId(), null)).thenReturn(existing);
-        when(conflicts.write(any(), any(), any(), any(), eq("delete_wins"), any(), any()))
+        when(conflicts.write(
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        eq(br.com.certamecards.sync.domain.ConflictReason.DELETE_WINS),
+                        any(),
+                        any()))
                 .thenReturn(UUID.randomUUID());
 
         MutationResult result = writer.attempt(command(operation, olderOrder));
 
         assertThat(result.outcome()).isEqualTo(MutationOutcome.CONFLICT);
-        verify(conflicts).write(any(), any(), any(), any(), eq("delete_wins"), any(), any());
+        verify(conflicts)
+                .write(
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        eq(br.com.certamecards.sync.domain.ConflictReason.DELETE_WINS),
+                        any(),
+                        any());
     }
 
     @Test

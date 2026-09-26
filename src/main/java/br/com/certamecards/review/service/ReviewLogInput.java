@@ -1,5 +1,6 @@
 package br.com.certamecards.review.service;
 
+import br.com.certamecards.common.sync.EventClock;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -14,4 +15,6 @@ public record ReviewLogInput(
         String stateAfter,
         boolean offline,
         UUID deviceId,
-        UUID sessionId) {}
+        UUID sessionId,
+        EventClock clock,
+        Instant observedServerTime) {}

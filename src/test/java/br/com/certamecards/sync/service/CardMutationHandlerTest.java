@@ -10,8 +10,8 @@ import static org.mockito.Mockito.when;
 import br.com.certamecards.card.domain.Card;
 import br.com.certamecards.card.service.CardCreationResult;
 import br.com.certamecards.card.service.CardService;
-import br.com.certamecards.sync.domain.EventClock;
-import br.com.certamecards.sync.domain.EventOrder;
+import br.com.certamecards.common.sync.EventClock;
+import br.com.certamecards.common.sync.EventOrder;
 import br.com.certamecards.sync.domain.MutationOutcome;
 import br.com.certamecards.sync.domain.MutationResult;
 import br.com.certamecards.sync.domain.SyncMutationOperation;
@@ -29,7 +29,7 @@ class CardMutationHandlerTest {
     private static final UUID USER_ID = UUID.randomUUID();
     private final CardService cardService = mock(CardService.class);
     private final MutationPayloadReader payloadReader = new MutationPayloadReader(new ObjectMapper());
-    private final CardMutationHandler handler = new CardMutationHandler(cardService, payloadReader);
+    private final CardMutationHandler handler = new CardMutationHandler(cardService, payloadReader, new ObjectMapper());
 
     @Test
     void givenCreateOperation_whenHandling_thenCreatesCard() {

@@ -6,12 +6,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import br.com.certamecards.common.sync.EventClock;
+import br.com.certamecards.common.sync.EventOrder;
 import br.com.certamecards.settings.domain.Theme;
 import br.com.certamecards.settings.domain.UpdateSettingsCommand;
 import br.com.certamecards.settings.domain.UserSettings;
 import br.com.certamecards.settings.service.UserSettingsService;
-import br.com.certamecards.sync.domain.EventClock;
-import br.com.certamecards.sync.domain.EventOrder;
 import br.com.certamecards.sync.domain.MutationOutcome;
 import br.com.certamecards.sync.domain.MutationResult;
 import br.com.certamecards.sync.domain.SyncMutationOperation;

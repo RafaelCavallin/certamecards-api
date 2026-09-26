@@ -10,8 +10,8 @@ import static org.mockito.Mockito.when;
 
 import br.com.certamecards.common.error.ApiException;
 import br.com.certamecards.common.error.ErrorCode;
-import br.com.certamecards.sync.domain.EventClock;
-import br.com.certamecards.sync.domain.EventOrder;
+import br.com.certamecards.common.sync.EventClock;
+import br.com.certamecards.common.sync.EventOrder;
 import br.com.certamecards.sync.domain.MutationOutcome;
 import br.com.certamecards.sync.domain.MutationReceipt;
 import br.com.certamecards.sync.domain.MutationResult;

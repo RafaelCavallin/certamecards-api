@@ -25,7 +25,9 @@ class LibraryTestProgress {
         String review = "{\"id\":\"" + UUID.randomUUID() + "\",\"cardId\":\"" + cardId
                 + "\",\"kind\":\"review\",\"rating\":3,\"reviewedAt\":\"" + reviewedAt
                 + "\",\"durationMs\":4000,\"stateBefore\":null,\"stateAfter\":" + state(reviewedAt)
-                + ",\"offline\":false,\"deviceId\":\"" + UUID.randomUUID() + "\",\"sessionId\":null}";
+                + ",\"offline\":false,\"deviceId\":\"" + UUID.randomUUID() + "\",\"sessionId\":null,"
+                + "\"clock\":{\"wallTime\":\"" + reviewedAt + "\",\"logicalCounter\":0},"
+                + "\"observedServerTime\":\"" + reviewedAt + "\"}";
         String body = "{\"deviceId\":\"" + UUID.randomUUID() + "\",\"reviews\":[" + review + "],\"voids\":[],"
                 + "\"states\":[" + stateWithCount(cardId, reviewedAt, reviewCount) + "]}";
         return push(token, body);

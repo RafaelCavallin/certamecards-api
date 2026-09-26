@@ -2,7 +2,7 @@ package br.com.certamecards.sync.persistence;
 
 import static br.com.certamecards.common.persistence.ResultSetInstants.instant;
 
-import br.com.certamecards.sync.domain.EventOrder;
+import br.com.certamecards.common.sync.EventOrder;
 import br.com.certamecards.sync.domain.MutationReceipt;
 import java.sql.ResultSet;
 import java.sql.SQLException;

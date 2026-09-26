@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,6 +66,7 @@ class SubjectAdminApiIT {
     private JavaMailSender mailSender;
 
     @Test
+    @DisplayName("TI-06 — candidato na área administrativa")
     void givenCandidate_whenAccessingAdminSubjects_thenForbidden() throws Exception {
         doNothing().when(mailSender).send(any(MimeMessage.class));
         String candidateToken = registerConfirmAndLogin("iris.candidata@exemplo.com", "Iris");
@@ -75,6 +77,7 @@ class SubjectAdminApiIT {
     }
 
     @Test
+    @DisplayName("TI-07 — nome de matéria duplicado (índice único)")
     void givenDuplicateNormalizedName_whenCreatingSubject_thenSecondRequestIsRejected() throws Exception {
         doNothing().when(mailSender).send(any(MimeMessage.class));
         String adminToken = registerConfirmLoginAndPromote("wagner.admin@exemplo.com", "Wagner");
@@ -94,6 +97,7 @@ class SubjectAdminApiIT {
     }
 
     @Test
+    @DisplayName("TI-07 — nome de matéria duplicado com duas requisições concorrentes")
     void givenConcurrentCreationsWithSameNormalizedName_whenCreatingSubject_thenOnlyOneSucceeds() throws Exception {
         doNothing().when(mailSender).send(any(MimeMessage.class));
         String adminToken = registerConfirmLoginAndPromote("otavio.admin@exemplo.com", "Otávio");

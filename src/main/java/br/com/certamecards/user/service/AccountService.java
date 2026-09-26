@@ -9,7 +9,6 @@ import br.com.certamecards.user.domain.User;
 import br.com.certamecards.user.domain.UserRole;
 import br.com.certamecards.user.persistence.AccountPurgeQuery;
 import br.com.certamecards.user.persistence.UserRepository;
-import java.time.Clock;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,19 +21,16 @@ public class AccountService {
     private final PasswordEncoder passwordEncoder;
     private final OneTimeTokenService oneTimeTokenService;
     private final AccountPurgeQuery purgeQuery;
-    private final Clock clock;
 
     public AccountService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             OneTimeTokenService oneTimeTokenService,
-            AccountPurgeQuery purgeQuery,
-            Clock clock) {
+            AccountPurgeQuery purgeQuery) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.oneTimeTokenService = oneTimeTokenService;
         this.purgeQuery = purgeQuery;
-        this.clock = clock;
     }
 
     public User getProfile(UUID userId) {
@@ -46,11 +42,6 @@ public class AccountService {
         User user = getProfile(userId);
         user.changeDisplayName(displayName.strip());
         return user;
-    }
-
-    @Transactional
-    public void acceptTerms(UUID userId, String version) {
-        getProfile(userId).acceptTerms(version, clock.instant());
     }
 
     @Transactional

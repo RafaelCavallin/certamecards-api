@@ -11,9 +11,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.certamecards.subject.persistence.SubjectRepository;
+import br.com.certamecards.support.CookieTestSupport;
 import br.com.certamecards.support.MutableClock;
 import br.com.certamecards.support.PostgresContainerSupport;
 import jakarta.mail.internet.MimeMessage;
+import jakarta.servlet.http.Cookie;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -153,6 +155,47 @@ class TestSupportApiIT {
         mockMvc.perform(get("/api/library/decks/" + deckId + "/preview").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.deck.cardCount").value(5));
+    }
+
+    @Test
+    void givenActiveRefreshToken_whenRevokingSessions_thenSubsequentRefreshIsUnauthorized() throws Exception {
+        doNothing().when(mailSender).send(any(MimeMessage.class));
+        String email = "raimunda.candidata@exemplo.com";
+        mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(registerBody(email, "Raimunda")));
+        ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(mailSender, timeout(5000)).send(captor.capture());
+        Matcher matcher = TOKEN_PATTERN.matcher((String) captor.getValue().getContent());
+        assertThat(matcher.find()).isTrue();
+        mockMvc.perform(post("/api/auth/confirm-email")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"" + matcher.group(1) + "\"}"));
+        var loginResult = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody(email)))
+                .andExpect(status().isOk())
+                .andReturn();
+        String accessToken = objectMapper
+                .readTree(loginResult.getResponse().getContentAsString())
+                .get("accessToken")
+                .asString();
+        Cookie refreshCookie =
+                CookieTestSupport.fromSetCookieHeader(loginResult.getResponse().getHeader("Set-Cookie"));
+        mockMvc.perform(post("/api/me/terms")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":\"2026-09-01\"}"));
+        mutableClock.advanceBy(Duration.ofSeconds(31));
+
+        mockMvc.perform(post("/api/test-support/revoke-sessions").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .header("Origin", "https://certamecards.localhost")
+                        .header("X-Certame-Client", "web")
+                        .cookie(refreshCookie))
+                .andExpect(status().isUnauthorized());
     }
 
     private String seedOfficial(String token, String scenario, int count) throws Exception {

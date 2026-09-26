@@ -1,9 +1,9 @@
 package br.com.certamecards.review.persistence;
 
+import br.com.certamecards.common.sync.EventOrder;
 import br.com.certamecards.review.service.ReviewLogInput;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
@@ -20,7 +20,7 @@ public class ReviewLogWriter {
             VALUES
                 (:id, :userId, :cardId, :kind, :rating, :reviewedAt, :durationMs,
                  CAST(:stateBefore AS jsonb), CAST(:stateAfter AS jsonb), :offline, :deviceId, :sessionId, :receivedAt,
-                 :reviewedAt, 0, :deviceId, :id)
+                 :eventAt, :eventCounter, :eventDeviceId, :operationId)
             ON CONFLICT (id) DO NOTHING
             """;
 
@@ -30,11 +30,7 @@ public class ReviewLogWriter {
         this.jdbcClient = jdbcClient;
     }
 
-    public void insertAll(UUID userId, List<ReviewLogInput> reviews, Instant receivedAt) {
-        reviews.forEach(review -> insertOne(userId, review, receivedAt));
-    }
-
-    private void insertOne(UUID userId, ReviewLogInput review, Instant receivedAt) {
+    public void insertOne(UUID userId, ReviewLogInput review, EventOrder order, Instant receivedAt) {
         jdbcClient
                 .sql(SQL)
                 .param("id", review.id())
@@ -50,6 +46,10 @@ public class ReviewLogWriter {
                 .param("deviceId", review.deviceId())
                 .param("sessionId", review.sessionId())
                 .param("receivedAt", Timestamp.from(receivedAt))
+                .param("eventAt", Timestamp.from(order.eventAt()))
+                .param("eventCounter", order.logicalCounter())
+                .param("eventDeviceId", order.deviceId())
+                .param("operationId", order.operationId())
                 .update();
     }
 }

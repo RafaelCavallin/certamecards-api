@@ -11,24 +11,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import br.com.certamecards.support.MutableClock;
 import br.com.certamecards.support.PostgresContainerSupport;
 import br.com.certamecards.user.persistence.UserRepository;
 import jakarta.mail.internet.MimeMessage;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
@@ -39,7 +33,7 @@ import tools.jackson.databind.ObjectMapper;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import({PostgresContainerSupport.class, AdminApiIT.MutableClockConfig.class})
+@Import(PostgresContainerSupport.class)
 class AdminApiIT {
 
     private static final Pattern TOKEN_PATTERN = Pattern.compile("token=([^\"'\\s]+)");
@@ -53,13 +47,11 @@ class AdminApiIT {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private MutableClock mutableClock;
-
     @MockitoSpyBean
     private JavaMailSender mailSender;
 
     @Test
+    @DisplayName("TI-09 — conceder e retirar admin")
     void givenGrantedAndRevokedAdmin_whenAccessingAdminArea_thenAccessFollowsCurrentRole() throws Exception {
         doNothing().when(mailSender).send(any(MimeMessage.class));
         String adminToken = registerConfirmLoginAndPromote("teodora.admin@exemplo.com", "Teodora");
@@ -71,7 +63,6 @@ class AdminApiIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + candidateEmail + "\"}"))
                 .andExpect(status().isOk());
-        mutableClock.advanceBy(Duration.ofSeconds(31));
 
         mockMvc.perform(get("/api/admin/subjects").header("Authorization", "Bearer " + candidateToken))
                 .andExpect(status().isOk());
@@ -80,7 +71,6 @@ class AdminApiIT {
                 userRepository.findByEmail(candidateEmail).orElseThrow().getId().toString();
         mockMvc.perform(delete("/api/admin/admins/" + candidateId).header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
-        mutableClock.advanceBy(Duration.ofSeconds(31));
 
         mockMvc.perform(get("/api/admin/subjects").header("Authorization", "Bearer " + candidateToken))
                 .andExpect(status().isForbidden());
@@ -132,7 +122,6 @@ class AdminApiIT {
                 .header("Authorization", "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"version\":\"2026-09-01\"}"));
-        mutableClock.advanceBy(Duration.ofSeconds(31));
     }
 
     private String registerBody(String email, String displayName) {
@@ -142,15 +131,5 @@ class AdminApiIT {
 
     private String loginBody(String email) {
         return "{\"email\":\"" + email + "\",\"password\":\"senha-forte-123\"}";
-    }
-
-    @TestConfiguration
-    static class MutableClockConfig {
-
-        @Bean
-        @Primary
-        MutableClock mutableClock() {
-            return new MutableClock(Instant.now(), ZoneOffset.UTC);
-        }
     }
 }

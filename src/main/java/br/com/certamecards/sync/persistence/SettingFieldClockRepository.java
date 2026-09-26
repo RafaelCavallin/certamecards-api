@@ -1,6 +1,6 @@
 package br.com.certamecards.sync.persistence;
 
-import br.com.certamecards.sync.domain.EventOrder;
+import br.com.certamecards.common.sync.EventOrder;
 import java.sql.Timestamp;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;

@@ -1,4 +1,4 @@
-package br.com.certamecards.sync.domain;
+package br.com.certamecards.common.sync;
 
 import java.time.Instant;
 import java.util.Comparator;

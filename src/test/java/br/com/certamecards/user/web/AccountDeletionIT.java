@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +57,7 @@ class AccountDeletionIT {
     private JavaMailSender mailSender;
 
     @Test
+    @DisplayName("TI-05 — exclusão da conta")
     void givenAccountDeleted_whenReusingOldAccessTokenAfterCacheExpiry_thenUnauthenticatedAndEmailIsFree()
             throws Exception {
         doNothing().when(mailSender).send(any(MimeMessage.class));

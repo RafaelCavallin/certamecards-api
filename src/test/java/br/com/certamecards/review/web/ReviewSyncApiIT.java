@@ -20,6 +20,7 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,6 +66,7 @@ class ReviewSyncApiIT {
     private JavaMailSender mailSender;
 
     @Test
+    @DisplayName("TI-16 — envio idempotente")
     void givenSameBatch_whenPushingTwice_thenIsIdempotent() throws Exception {
         String token = registerConfirmAndLogin("ida.candidata@exemplo.com", "Ida");
         UUID cardId = createDeckAndCard(token);
@@ -74,13 +76,14 @@ class ReviewSyncApiIT {
         JsonNode first = pushReviews(token, body);
         JsonNode second = pushReviews(token, body);
 
-        assertThat(first.get("acceptedReviewIds").get(0).asString()).isEqualTo(reviewId.toString());
-        assertThat(second.get("acceptedReviewIds").get(0).asString()).isEqualTo(reviewId.toString());
+        assertThat(first.get("acceptedReviews").get(0).get("id").asString()).isEqualTo(reviewId.toString());
+        assertThat(second.get("acceptedReviews").get(0).get("id").asString()).isEqualTo(reviewId.toString());
         JsonNode history = getHistory(token, cardId);
         assertThat(history.get("reviewLogs").size()).isEqualTo(1);
     }
 
     @Test
+    @DisplayName("TI-17 — dois dispositivos, ordens diferentes")
     void givenTwoDevicesInDifferentOrder_whenPushingStates_thenLoserBecomesStaleThenResolves() throws Exception {
         String token = registerConfirmAndLogin("teo.candidato@exemplo.com", "Teo");
         UUID cardId = createDeckAndCard(token);
@@ -104,6 +107,7 @@ class ReviewSyncApiIT {
     }
 
     @Test
+    @DisplayName("TI-18 — anulação depois do envio")
     void givenVoidAfterPush_whenSendingVoid_thenIsAcceptedAndPersisted() throws Exception {
         String token = registerConfirmAndLogin("vera.candidata@exemplo.com", "Vera");
         UUID cardId = createDeckAndCard(token);
@@ -228,7 +232,8 @@ class ReviewSyncApiIT {
         return "{\"id\":\"" + reviewId + "\",\"cardId\":\"" + cardId + "\",\"kind\":\"review\",\"rating\":" + rating
                 + ",\"reviewedAt\":\"" + reviewedAt + "\",\"durationMs\":4000,\"stateBefore\":" + stateBeforeJson
                 + ",\"stateAfter\":" + STATE_JSON + ",\"offline\":true,\"deviceId\":\"" + UUID.randomUUID()
-                + "\",\"sessionId\":null}";
+                + "\",\"sessionId\":null,\"clock\":{\"wallTime\":\"" + reviewedAt + "\",\"logicalCounter\":0}"
+                + ",\"observedServerTime\":\"" + reviewedAt + "\"}";
     }
 
     private String stateJson(UUID cardId, int reviewCount) {

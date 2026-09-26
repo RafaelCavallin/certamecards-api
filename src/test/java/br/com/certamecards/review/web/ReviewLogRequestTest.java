@@ -2,6 +2,7 @@ package br.com.certamecards.review.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import br.com.certamecards.common.sync.EventClock;
 import br.com.certamecards.review.service.ReviewLogInput;
 import java.time.Instant;
 import java.util.UUID;
@@ -27,7 +28,9 @@ class ReviewLogRequestTest {
                 MAPPER.createObjectNode(),
                 false,
                 UUID.randomUUID(),
-                null);
+                null,
+                new EventClock(NOW, 0),
+                NOW);
 
         ReviewLogInput input = request.toInput();
 
@@ -47,7 +50,9 @@ class ReviewLogRequestTest {
                 MAPPER.createObjectNode(),
                 false,
                 UUID.randomUUID(),
-                null);
+                null,
+                new EventClock(NOW, 0),
+                NOW);
 
         ReviewLogInput input = request.toInput();
 

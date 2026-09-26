@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class OneTimeTokenServiceTest {
@@ -32,6 +33,7 @@ class OneTimeTokenServiceTest {
     private final OneTimeTokenService service = new OneTimeTokenService(repository, properties, clock);
 
     @Test
+    @DisplayName("TU-26 — token emitido expira conforme o TTL da finalidade")
     void givenTokenIssued_whenIssuing_thenExpiresAtMatchesPurposeTtl() {
         IssuedToken issued = service.issue(USER_ID, OneTimeTokenPurpose.CONFIRM_EMAIL);
 
@@ -39,6 +41,7 @@ class OneTimeTokenServiceTest {
     }
 
     @Test
+    @DisplayName("TU-26 — token com 61 min lança token_expired")
     void givenTokenAgedSixtyOneMinutes_whenConsuming_thenThrowsTokenExpired() {
         OneTimeToken token = new OneTimeToken(
                 UUID.randomUUID(),
@@ -54,6 +57,7 @@ class OneTimeTokenServiceTest {
     }
 
     @Test
+    @DisplayName("TU-26 — segundo uso do mesmo token lança token_used")
     void givenTokenAlreadyUsed_whenConsumingSecondTime_thenThrowsTokenUsed() {
         OneTimeToken token = new OneTimeToken(
                 UUID.randomUUID(),
@@ -70,6 +74,7 @@ class OneTimeTokenServiceTest {
     }
 
     @Test
+    @DisplayName("TU-26 — token válido e não usado é consumido e marcado como usado")
     void givenValidUnusedToken_whenConsuming_thenMarksUsedAndReturnsToken() {
         OneTimeToken token = new OneTimeToken(
                 UUID.randomUUID(),
@@ -85,6 +90,7 @@ class OneTimeTokenServiceTest {
     }
 
     @Test
+    @DisplayName("TU-26 — finalidade diferente da esperada lança token_expired")
     void givenTokenWithDifferentPurpose_whenConsuming_thenThrowsTokenExpired() {
         OneTimeToken token = new OneTimeToken(
                 UUID.randomUUID(),

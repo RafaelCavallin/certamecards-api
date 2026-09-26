@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class DeckServiceTest {
@@ -41,6 +42,7 @@ class DeckServiceTest {
     }
 
     @Test
+    @DisplayName("TU-31 — criar deck com matéria inativa lança subject_inactive")
     void givenInactiveSubject_whenCreating_thenThrowsSubjectInactive() {
         UUID subjectId = UUID.randomUUID();
         when(deckRepository.findById(any())).thenReturn(Optional.empty());
@@ -70,6 +72,7 @@ class DeckServiceTest {
     }
 
     @Test
+    @DisplayName("TU-31 — editar mantendo a matéria inativa sem trocá-la é permitido")
     void givenActiveInactiveSubjectUnchanged_whenRenamingOnly_thenSucceedsWithoutSubjectCheck() {
         UUID ownerId = UUID.randomUUID();
         UUID deckId = UUID.randomUUID();
@@ -95,6 +98,23 @@ class DeckServiceTest {
         assertThatThrownBy(() -> deckService.update(ownerId, deckId, command))
                 .isInstanceOf(ApiException.class)
                 .satisfies(ex -> assertThat(((ApiException) ex).getErrorCode()).isEqualTo(ErrorCode.VERSION_CONFLICT));
+    }
+
+    @Test
+    void givenDeletedDeck_whenRestoring_thenClearsDeletionAndAppliesContent() {
+        UUID ownerId = UUID.randomUUID();
+        UUID deckId = UUID.randomUUID();
+        UUID subjectId = UUID.randomUUID();
+        Deck deck = new Deck(deckId, ownerId, subjectId, "Antigo");
+        deck.markDeleted(FIXED_NOW.minusSeconds(60));
+        when(deckRepository.findByIdAndOwnerId(deckId, ownerId)).thenReturn(Optional.of(deck));
+        when(deckRepository.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        UpdateDeckCommand command = new UpdateDeckCommand(subjectId, new DeckContent("Restaurado", null), 0);
+
+        Deck restored = deckService.restore(ownerId, deckId, command);
+
+        assertThat(restored.isDeleted()).isFalse();
+        assertThat(restored.getName()).isEqualTo("Restaurado");
     }
 
     @Test

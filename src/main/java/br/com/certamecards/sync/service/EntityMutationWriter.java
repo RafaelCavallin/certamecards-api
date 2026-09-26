@@ -1,13 +1,12 @@
 package br.com.certamecards.sync.service;
 
-import br.com.certamecards.sync.domain.EventOrder;
+import br.com.certamecards.common.sync.EventOrder;
 import br.com.certamecards.sync.domain.MutationError;
 import br.com.certamecards.sync.domain.MutationOutcome;
 import br.com.certamecards.sync.domain.MutationReceipt;
 import br.com.certamecards.sync.domain.MutationResult;
 import br.com.certamecards.sync.domain.SyncEntityHead;
 import br.com.certamecards.sync.domain.SyncMutationOperation;
-import br.com.certamecards.sync.persistence.SyncConflictWriter;
 import br.com.certamecards.sync.persistence.SyncEntityHeadRepository;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -17,13 +16,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class EntityMutationWriter {
 
     private final SyncEntityHeadRepository heads;
-    private final SyncConflictWriter conflicts;
+    private final EntityConflictRegistrar conflictRegistrar;
     private final MutationReceiptService receipts;
 
     public EntityMutationWriter(
-            SyncEntityHeadRepository heads, SyncConflictWriter conflicts, MutationReceiptService receipts) {
+            SyncEntityHeadRepository heads,
+            EntityConflictRegistrar conflictRegistrar,
+            MutationReceiptService receipts) {
         this.heads = heads;
-        this.conflicts = conflicts;
+        this.conflictRegistrar = conflictRegistrar;
         this.receipts = receipts;
     }
 
@@ -51,7 +52,7 @@ public class EntityMutationWriter {
                 : new MutationError(receipt.errorCode(), "A alteração foi recusada.");
         return new MutationResult(
                 receipt.operationId(),
-                MutationOutcome.DUPLICATE,
+                receipt.replayOutcome(),
                 receipt.entityVersion(),
                 receipt.changeSeq(),
                 receipt.order(),
@@ -96,6 +97,9 @@ public class EntityMutationWriter {
     }
 
     private MutationResult apply(EntityMutationCommand command, SyncEntityHead head) {
+        if (!isRestore(command.operation()) && conflictRegistrar.isConcurrentSupersede(head, command.operation())) {
+            conflictRegistrar.registerSupersededEdit(command, head);
+        }
         MutationResult result = command.handler()
                 .handle(command.userId(), new MutationContext(command.operation(), command.order(), head.version()));
         heads.save(updated(head, command.operation(), command.order(), result.entityVersion()));
@@ -120,14 +124,7 @@ public class EntityMutationWriter {
     }
 
     private MutationResult resolveConcurrent(EntityMutationCommand command, SyncEntityHead head) {
-        UUID conflictId = conflicts.write(
-                command.userId(),
-                head.entityType(),
-                command.operation(),
-                head.winningOperationId(),
-                isDelete(command.operation()) || head.deleted() ? "delete_wins" : "concurrent_edit",
-                snapshot(command.operation()),
-                "{}");
+        UUID conflictId = conflictRegistrar.registerLosingIncoming(command, head);
         return new MutationResult(
                 command.operation().operationId(),
                 MutationOutcome.CONFLICT,
@@ -139,19 +136,20 @@ public class EntityMutationWriter {
     }
 
     private MutationResult parentDeleted(EntityMutationCommand command, SyncEntityHead parent) {
-        UUID conflictId = conflicts.write(
-                command.userId(),
-                "card",
-                command.operation(),
-                parent.winningOperationId(),
-                "parent_deleted",
-                snapshot(command.operation()),
-                "{}");
+        UUID conflictId = conflictRegistrar.registerParentDeleted(command, parent);
         return failed(command.operation(), command.order(), "parent_deleted", conflictId);
     }
 
     private MutationResult deleted(EntityMutationCommand command, SyncEntityHead head) {
-        return failed(command.operation(), command.order(), "entity_deleted", head.winningOperationId());
+        if (!isDelete(command.operation())) return resolveConcurrent(command, head);
+        return new MutationResult(
+                command.operation().operationId(),
+                MutationOutcome.APPLIED,
+                head.version(),
+                null,
+                command.order(),
+                null,
+                null);
     }
 
     private MutationResult failed(SyncMutationOperation operation, EventOrder order, String code, UUID conflictId) {
@@ -174,10 +172,6 @@ public class EntityMutationWriter {
                 command.order(),
                 null,
                 new MutationError(code, "A alteração precisa de atenção."));
-    }
-
-    private String snapshot(SyncMutationOperation operation) {
-        return operation.payload().toString();
     }
 
     private String typeOf(SyncMutationOperation operation) {

@@ -34,6 +34,7 @@ public enum ErrorCode {
     TOKEN_EXPIRED(HttpStatus.GONE, "Link expirado", "Peça um novo link."),
     TOKEN_USED(HttpStatus.GONE, "Link já usado", "Peça um novo link."),
     RESYNC_REQUIRED(HttpStatus.GONE, "Sincronização completa necessária", "Refaça a sincronização desde o início."),
+    CONFLICT_EXPIRED(HttpStatus.GONE, "Conflito expirado", "O prazo de recuperação deste conflito terminou."),
     OPERATION_ID_REUSED(
             HttpStatus.CONFLICT,
             "Identificador de operação reutilizado",

@@ -6,8 +6,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import br.com.certamecards.sync.domain.EventClock;
-import br.com.certamecards.sync.domain.EventOrder;
+import br.com.certamecards.common.sync.EventClock;
+import br.com.certamecards.common.sync.EventOrder;
+import br.com.certamecards.common.sync.EventOrderNormalizer;
 import br.com.certamecards.sync.domain.MutationOutcome;
 import br.com.certamecards.sync.domain.MutationResult;
 import br.com.certamecards.sync.domain.SyncMutationBatch;
@@ -20,6 +21,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -33,11 +35,22 @@ class MutationBatchServiceTest {
     private final MutationDependencyResolver dependencyResolver = mock(MutationDependencyResolver.class);
     private final EventOrderNormalizer orderNormalizer = mock(EventOrderNormalizer.class);
     private final EntityMutationCoordinator coordinator = mock(EntityMutationCoordinator.class);
+    private final PreferenceMutationCoordinator preferenceCoordinator = mock(PreferenceMutationCoordinator.class);
     private final MutationHandlerRegistry handlers = mock(MutationHandlerRegistry.class);
     private final MutationReceiptService receipts = mock(MutationReceiptService.class);
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+    private final SyncMutationMetricsRecorder metrics = mock(SyncMutationMetricsRecorder.class);
     private final MutationBatchService service = new MutationBatchService(
-            validator, dependencyResolver, orderNormalizer, coordinator, handlers, receipts, new ObjectMapper(), clock);
+            validator,
+            dependencyResolver,
+            orderNormalizer,
+            coordinator,
+            preferenceCoordinator,
+            handlers,
+            receipts,
+            new ObjectMapper(),
+            clock,
+            metrics);
 
     @Test
     void givenDependencyThatFailed_whenApplying_thenDependentIsBlocked() {
@@ -65,6 +78,34 @@ class MutationBatchServiceTest {
                 .orElseThrow();
         assertThat(childResult.outcome()).isEqualTo(MutationOutcome.DEPENDENCY_BLOCKED);
         assertThat(childResult.error().code()).isEqualTo("dependency_failed");
+    }
+
+    @Test
+    @DisplayName("TU-63 — preferência recusada e reenviada repete a recusa com o mesmo código")
+    void givenPreferenceOperationAlreadyRejected_whenApplying_thenReplaysRejection() {
+        SyncMutationOperation operation = operation(SyncOperationKind.CARD_SUSPENSION, List.of());
+        SyncMutationBatch batch = new SyncMutationBatch(DEVICE_ID, List.of(operation));
+        when(dependencyResolver.order(batch.operations())).thenReturn(List.of(operation));
+        when(orderNormalizer.normalize(any(), any(), any(), any(), any())).thenReturn(order());
+        when(handlers.needsEntityHead(operation)).thenReturn(false);
+        br.com.certamecards.sync.domain.MutationReceipt receipt = new br.com.certamecards.sync.domain.MutationReceipt(
+                USER_ID,
+                operation.operationId(),
+                "hash",
+                "card_suspension",
+                order(),
+                "action_required",
+                null,
+                null,
+                null,
+                "not_applicable",
+                NOW);
+        when(receipts.find(USER_ID, operation.operationId())).thenReturn(Optional.of(receipt));
+
+        SyncMutationResponse response = service.apply(USER_ID, batch);
+
+        assertThat(response.results().get(0).outcome()).isEqualTo(MutationOutcome.ACTION_REQUIRED);
+        assertThat(response.results().get(0).error().code()).isEqualTo("not_applicable");
     }
 
     @Test
@@ -175,7 +216,7 @@ class MutationBatchServiceTest {
     }
 
     @Test
-    void givenPreferenceHandlerReturnsError_whenApplying_thenReservesWithErrorCode() {
+    void givenPreferenceHandlerReturnsError_whenApplying_thenDelegatesToPreferenceWriter() {
         SyncMutationOperation operation = operation(SyncOperationKind.DECK_RESET, List.of());
         SyncMutationBatch batch = new SyncMutationBatch(DEVICE_ID, List.of(operation));
         when(dependencyResolver.order(batch.operations())).thenReturn(List.of(operation));
@@ -191,11 +232,20 @@ class MutationBatchServiceTest {
                         null,
                         new br.com.certamecards.sync.domain.MutationError("not_applicable", "erro")));
         when(receipts.find(USER_ID, operation.operationId())).thenReturn(Optional.empty());
+        when(preferenceCoordinator.attempt(any()))
+                .thenReturn(new MutationResult(
+                        operation.operationId(),
+                        MutationOutcome.ACTION_REQUIRED,
+                        null,
+                        null,
+                        order(),
+                        null,
+                        new br.com.certamecards.sync.domain.MutationError("not_applicable", "erro")));
 
         SyncMutationResponse response = service.apply(USER_ID, batch);
 
         assertThat(response.results().get(0).outcome()).isEqualTo(MutationOutcome.ACTION_REQUIRED);
-        verify(receipts).reserve(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(preferenceCoordinator).attempt(any());
     }
 
     private SyncMutationOperation operation(SyncOperationKind kind, List<UUID> dependsOn) {

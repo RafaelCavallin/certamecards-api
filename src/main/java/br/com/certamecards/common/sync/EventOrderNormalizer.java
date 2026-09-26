@@ -1,7 +1,5 @@
-package br.com.certamecards.sync.service;
+package br.com.certamecards.common.sync;
 
-import br.com.certamecards.sync.domain.EventClock;
-import br.com.certamecards.sync.domain.EventOrder;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Component;

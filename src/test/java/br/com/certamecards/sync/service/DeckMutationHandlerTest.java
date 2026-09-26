@@ -7,11 +7,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import br.com.certamecards.common.sync.EventClock;
+import br.com.certamecards.common.sync.EventOrder;
 import br.com.certamecards.deck.domain.Deck;
 import br.com.certamecards.deck.service.DeckCreationResult;
 import br.com.certamecards.deck.service.DeckService;
-import br.com.certamecards.sync.domain.EventClock;
-import br.com.certamecards.sync.domain.EventOrder;
 import br.com.certamecards.sync.domain.MutationOutcome;
 import br.com.certamecards.sync.domain.MutationResult;
 import br.com.certamecards.sync.domain.SyncMutationOperation;
@@ -29,7 +29,7 @@ class DeckMutationHandlerTest {
     private static final UUID USER_ID = UUID.randomUUID();
     private final DeckService deckService = mock(DeckService.class);
     private final MutationPayloadReader payloadReader = new MutationPayloadReader(new ObjectMapper());
-    private final DeckMutationHandler handler = new DeckMutationHandler(deckService, payloadReader);
+    private final DeckMutationHandler handler = new DeckMutationHandler(deckService, payloadReader, new ObjectMapper());
 
     @Test
     void givenCreateOperation_whenHandling_thenCreatesDeckAndReturnsApplied() {

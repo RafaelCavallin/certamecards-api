@@ -14,6 +14,7 @@ import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.Cookie;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +46,7 @@ class RefreshLogoutOriginIT {
     private JavaMailSender mailSender;
 
     @Test
+    @DisplayName("TI-04 — refresh e logout exigem Origin e X-Certame-Client")
     void givenMissingOriginHeaders_whenRefreshingOrLoggingOut_thenRejectedWithOriginRejected() throws Exception {
         doNothing().when(mailSender).send(any(MimeMessage.class));
         Cookie refreshCookie = CookieTestSupport.fromSetCookieHeader(registerConfirmLoginAndGetCookie());

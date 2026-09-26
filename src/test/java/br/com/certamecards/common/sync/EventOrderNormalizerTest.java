@@ -1,9 +1,7 @@
-package br.com.certamecards.sync.service;
+package br.com.certamecards.common.sync;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import br.com.certamecards.sync.domain.EventClock;
-import br.com.certamecards.sync.domain.EventOrder;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

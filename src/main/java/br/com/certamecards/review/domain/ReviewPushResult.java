@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record ReviewPushResult(
-        List<UUID> acceptedReviewIds,
+        List<AcceptedReview> acceptedReviews,
         List<RejectedReview> rejectedReviews,
         List<UUID> acceptedVoids,
         List<AppliedState> appliedStates,

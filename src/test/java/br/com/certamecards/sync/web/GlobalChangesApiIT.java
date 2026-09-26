@@ -23,6 +23,7 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +68,7 @@ class GlobalChangesApiIT {
     private JavaMailSender mailSender;
 
     @Test
+    @DisplayName("TI-19 — pull paginado e concorrência: nenhuma linha é pulada")
     void givenOpenTransactionOnAnOlderRow_whenPulling_thenNewerCommittedRowIsWithheldUntilItCommits() throws Exception {
         String token = registerConfirmAndLogin("wagner.barreira@exemplo.com", "Wagner");
         UUID subjectId = subjectRepository.findAll().get(0).getId();
@@ -87,6 +89,68 @@ class GlobalChangesApiIT {
             assertThat(containsDeck(afterCommit, firstDeckId)).isTrue();
             assertThat(containsDeck(afterCommit, secondDeckId)).isTrue();
         }
+    }
+
+    @Test
+    void givenPushedReview_whenPulling_thenReviewLogPayloadCarriesCanonicalOrder() throws Exception {
+        String token = registerConfirmAndLogin("nara.candidata@exemplo.com", "Nara");
+        UUID subjectId = subjectRepository.findAll().get(0).getId();
+        UUID deckId = createDeck(token, subjectId, "Deck de revisão");
+        UUID cardId = createCard(token, deckId);
+        UUID reviewId = UUID.randomUUID();
+        UUID deviceId = UUID.randomUUID();
+        pushReview(token, deviceId, reviewId, cardId);
+
+        JsonNode page = pull(token);
+
+        JsonNode payload = findReviewLogPayload(page, reviewId);
+        assertThat(payload).isNotNull();
+        assertThat(payload.get("operationId").asString()).isEqualTo(reviewId.toString());
+        assertThat(payload.get("eventDeviceId").asString()).isEqualTo(deviceId.toString());
+        assertThat(payload.get("eventCounter").asInt()).isZero();
+        assertThat(payload.get("eventAt").asString()).isNotBlank();
+    }
+
+    private JsonNode findReviewLogPayload(JsonNode page, UUID reviewId) {
+        for (var change : page.get("changes")) {
+            if (!"review_log".equals(change.get("type").asString())) {
+                continue;
+            }
+            var payload = change.get("payload");
+            if (reviewId.toString().equals(payload.get("id").asString())) {
+                return payload;
+            }
+        }
+        return null;
+    }
+
+    private UUID createCard(String token, UUID deckId) throws Exception {
+        UUID cardId = UUID.randomUUID();
+        mockMvc.perform(post("/api/decks/" + deckId + "/cards")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"id\":\"" + cardId + "\",\"front\":\"Frente\",\"back\":\"Verso\"}"))
+                .andExpect(status().isCreated());
+        return cardId;
+    }
+
+    private void pushReview(String token, UUID deviceId, UUID reviewId, UUID cardId) throws Exception {
+        Instant reviewedAt = Instant.now().minusSeconds(30);
+        String stateJson = "{\"cardId\":\"" + cardId + "\",\"state\":2,\"stability\":4.2,\"difficulty\":5.1,"
+                + "\"due\":\"2026-09-21T12:10:00Z\",\"lastReview\":\"2026-09-17T12:10:00Z\",\"reps\":3,"
+                + "\"lapses\":0,\"learningSteps\":0,\"scheduledDays\":4,\"reviewCount\":1}";
+        String reviewJson = "{\"id\":\"" + reviewId + "\",\"cardId\":\"" + cardId + "\",\"kind\":\"review\","
+                + "\"rating\":3,\"reviewedAt\":\"" + reviewedAt + "\",\"durationMs\":4000,\"stateBefore\":null,"
+                + "\"stateAfter\":" + stateJson + ",\"offline\":true,\"deviceId\":\"" + deviceId
+                + "\",\"sessionId\":null,\"clock\":{\"wallTime\":\"" + reviewedAt + "\",\"logicalCounter\":0}"
+                + ",\"observedServerTime\":\"" + reviewedAt + "\"}";
+        String body = "{\"deviceId\":\"" + deviceId + "\",\"reviews\":[" + reviewJson + "],\"voids\":[],"
+                + "\"states\":[" + stateJson + "]}";
+        mockMvc.perform(post("/api/sync/reviews")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
     }
 
     private boolean containsDeck(JsonNode page, UUID deckId) {

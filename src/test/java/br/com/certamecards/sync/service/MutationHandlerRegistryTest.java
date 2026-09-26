@@ -3,10 +3,7 @@ package br.com.certamecards.sync.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import br.com.certamecards.sync.domain.EventClock;
-import br.com.certamecards.sync.domain.EventOrder;
-import br.com.certamecards.sync.domain.MutationOutcome;
-import br.com.certamecards.sync.domain.MutationResult;
+import br.com.certamecards.common.sync.EventClock;
 import br.com.certamecards.sync.domain.SyncMutationOperation;
 import br.com.certamecards.sync.domain.SyncOperationKind;
 import java.time.Instant;
@@ -23,10 +20,18 @@ class MutationHandlerRegistryTest {
     private final DeckMutationHandler deckHandler = mock(DeckMutationHandler.class);
     private final CardMutationHandler cardHandler = mock(CardMutationHandler.class);
     private final CardPreferenceMutationHandler preferenceHandler = mock(CardPreferenceMutationHandler.class);
+    private final DeckResetHandler resetHandler = mock(DeckResetHandler.class);
     private final SettingsMutationHandler settingsHandler = mock(SettingsMutationHandler.class);
     private final ProfileMutationHandler profileHandler = mock(ProfileMutationHandler.class);
-    private final MutationHandlerRegistry registry =
-            new MutationHandlerRegistry(deckHandler, cardHandler, preferenceHandler, settingsHandler, profileHandler);
+    private final ConflictRestoreHandler conflictRestoreHandler = mock(ConflictRestoreHandler.class);
+    private final MutationHandlerRegistry registry = new MutationHandlerRegistry(
+            deckHandler,
+            cardHandler,
+            preferenceHandler,
+            resetHandler,
+            settingsHandler,
+            profileHandler,
+            conflictRestoreHandler);
 
     @ParameterizedTest
     @EnumSource(
@@ -44,12 +49,16 @@ class MutationHandlerRegistryTest {
         assertThat(registry.forOperation(operation(kind))).isSameAs(cardHandler);
     }
 
-    @ParameterizedTest
-    @EnumSource(
-            value = SyncOperationKind.class,
-            names = {"CARD_SUSPENSION", "DECK_RESET"})
-    void givenPreferenceOperation_whenResolving_thenReturnsPreferenceHandler(SyncOperationKind kind) {
-        assertThat(registry.forOperation(operation(kind))).isSameAs(preferenceHandler);
+    @Test
+    void givenSuspensionOperation_whenResolving_thenReturnsPreferenceHandler() {
+        assertThat(registry.forOperation(operation(SyncOperationKind.CARD_SUSPENSION)))
+                .isSameAs(preferenceHandler);
+    }
+
+    @Test
+    void givenResetOperation_whenResolving_thenReturnsResetHandler() {
+        assertThat(registry.forOperation(operation(SyncOperationKind.DECK_RESET)))
+                .isSameAs(resetHandler);
     }
 
     @Test
@@ -65,20 +74,23 @@ class MutationHandlerRegistryTest {
     }
 
     @Test
-    void givenUnsupportedOperation_whenResolving_thenReturnsNotApplicableHandler() {
-        SyncMutationOperation operation = operation(SyncOperationKind.CONFLICT_RESTORE);
-
-        MutationResult result = registry.forOperation(operation)
-                .handle(UUID.randomUUID(), new MutationContext(operation, order(), null));
-
-        assertThat(result.outcome()).isEqualTo(MutationOutcome.ACTION_REQUIRED);
-        assertThat(result.error().code()).isEqualTo("not_applicable");
+    void givenConflictRestoreOperation_whenResolving_thenReturnsConflictRestoreHandler() {
+        assertThat(registry.forOperation(operation(SyncOperationKind.CONFLICT_RESTORE)))
+                .isSameAs(conflictRestoreHandler);
     }
 
     @ParameterizedTest
     @EnumSource(
             value = SyncOperationKind.class,
-            names = {"DECK_CREATE", "DECK_UPDATE", "DECK_DELETE", "CARD_CREATE", "CARD_UPDATE", "CARD_DELETE"})
+            names = {
+                "DECK_CREATE",
+                "DECK_UPDATE",
+                "DECK_DELETE",
+                "CARD_CREATE",
+                "CARD_UPDATE",
+                "CARD_DELETE",
+                "CONFLICT_RESTORE"
+            })
     void givenEntityOperation_whenCheckingHead_thenNeedsHead(SyncOperationKind kind) {
         assertThat(registry.needsEntityHead(operation(kind))).isTrue();
     }
@@ -86,7 +98,7 @@ class MutationHandlerRegistryTest {
     @ParameterizedTest
     @EnumSource(
             value = SyncOperationKind.class,
-            names = {"CARD_SUSPENSION", "DECK_RESET", "SETTINGS_PATCH", "PROFILE_PATCH", "CONFLICT_RESTORE"})
+            names = {"CARD_SUSPENSION", "DECK_RESET", "SETTINGS_PATCH", "PROFILE_PATCH"})
     void givenPreferenceOperation_whenCheckingHead_thenDoesNotNeedHead(SyncOperationKind kind) {
         assertThat(registry.needsEntityHead(operation(kind))).isFalse();
     }
@@ -104,9 +116,5 @@ class MutationHandlerRegistryTest {
                 new EventClock(NOW, 0),
                 NOW,
                 JsonNodeFactory.instance.objectNode());
-    }
-
-    private EventOrder order() {
-        return new EventOrder(NOW, 0, UUID.randomUUID(), UUID.randomUUID());
     }
 }

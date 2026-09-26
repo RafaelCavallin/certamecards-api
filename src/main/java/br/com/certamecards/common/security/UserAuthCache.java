@@ -10,6 +10,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Component
 public class UserAuthCache {
@@ -33,6 +35,19 @@ public class UserAuthCache {
         Optional<AuthSnapshot> snapshot = userRepository.findById(userId).map(UserAuthCache::toSnapshot);
         cache.put(userId, new Entry(snapshot, clock.instant().plus(TTL)));
         return snapshot;
+    }
+
+    public void evictAfterCommit(UUID userId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            cache.remove(userId);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                cache.remove(userId);
+            }
+        });
     }
 
     private static AuthSnapshot toSnapshot(User user) {

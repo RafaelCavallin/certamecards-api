@@ -133,6 +133,56 @@ class SyncMutationApiIT {
                 + ",\"examDate\":null,\"timeZone\":null,\"theme\":null}}";
     }
 
+    @Test
+    void givenInvalidPayloadsInBatch_whenApplying_thenRejectsOnlyThoseWithValidationFailed() throws Exception {
+        String token = registerConfirmAndLogin("vania.candidata@exemplo.com", "Vânia");
+        UUID subjectId = subjectRepository.findAll().get(0).getId();
+        UUID deckId = UUID.randomUUID();
+        UUID deckOperationId = UUID.randomUUID();
+        UUID blankCardOperationId = UUID.randomUUID();
+        UUID validCardOperationId = UUID.randomUUID();
+        UUID orphanDeckOperationId = UUID.randomUUID();
+        String batch = batchOf(
+                UUID.randomUUID(),
+                deckOperation(deckOperationId, "deck_create", deckId, null, null, null, deckPayload(subjectId)),
+                cardOperation(
+                        blankCardOperationId,
+                        "card_create",
+                        UUID.randomUUID(),
+                        deckId,
+                        null,
+                        null,
+                        "{\"front\":\"  \",\"back\":\"Resposta\",\"source\":null}"),
+                cardOperation(
+                        validCardOperationId, "card_create", UUID.randomUUID(), deckId, null, null, cardPayload()),
+                deckOperation(
+                        orphanDeckOperationId,
+                        "deck_create",
+                        UUID.randomUUID(),
+                        null,
+                        null,
+                        null,
+                        "{\"subjectId\":null,\"name\":\"Sem matéria\",\"description\":null}"));
+
+        var results = objectMapper.readTree(postMutations(token, batch)).get("results");
+
+        assertThat(outcomeFor(results, deckOperationId)).isEqualTo("applied");
+        assertThat(outcomeFor(results, validCardOperationId)).isEqualTo("applied");
+        assertThat(outcomeFor(results, blankCardOperationId)).isEqualTo("action_required");
+        assertThat(errorCodeFor(results, blankCardOperationId)).isEqualTo("validation_failed");
+        assertThat(outcomeFor(results, orphanDeckOperationId)).isEqualTo("action_required");
+        assertThat(errorCodeFor(results, orphanDeckOperationId)).isEqualTo("validation_failed");
+    }
+
+    private String errorCodeFor(tools.jackson.databind.JsonNode results, UUID operationId) {
+        for (var result : results) {
+            if (result.get("operationId").asString().equals(operationId.toString())) {
+                return result.get("error").get("code").asString();
+            }
+        }
+        throw new IllegalStateException("Missing result for " + operationId);
+    }
+
     private String outcomeFor(tools.jackson.databind.JsonNode results, UUID operationId) {
         for (var result : results) {
             if (result.get("operationId").asString().equals(operationId.toString())) {

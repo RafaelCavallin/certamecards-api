@@ -5,7 +5,6 @@ import br.com.certamecards.review.domain.RejectedReview;
 import br.com.certamecards.review.domain.ReviewKind;
 import br.com.certamecards.review.domain.ReviewRejectionCode;
 import br.com.certamecards.review.domain.ReviewSyncLimits;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -15,11 +14,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class ReviewLogValidator {
 
-    public ReviewValidationOutcome validate(List<ReviewLogInput> reviews, Map<UUID, Card> ownedCards, Instant now) {
+    public ReviewValidationOutcome validate(List<ReviewLogInput> reviews, Map<UUID, Card> ownedCards) {
         List<ReviewLogInput> valid = new ArrayList<>();
         List<RejectedReview> rejected = new ArrayList<>();
         for (ReviewLogInput review : reviews) {
-            ReviewRejectionCode code = rejectionCodeFor(review, ownedCards, now);
+            ReviewRejectionCode code = rejectionCodeFor(review, ownedCards);
             addOutcome(review, code, valid, rejected);
         }
         return new ReviewValidationOutcome(valid, rejected);
@@ -37,12 +36,9 @@ public class ReviewLogValidator {
         rejected.add(RejectedReview.of(review.id(), code));
     }
 
-    private ReviewRejectionCode rejectionCodeFor(ReviewLogInput review, Map<UUID, Card> ownedCards, Instant now) {
+    private ReviewRejectionCode rejectionCodeFor(ReviewLogInput review, Map<UUID, Card> ownedCards) {
         if (!ownedCards.containsKey(review.cardId())) {
             return ReviewRejectionCode.UNKNOWN_CARD;
-        }
-        if (review.reviewedAt().isAfter(now.plus(ReviewSyncLimits.FUTURE_TOLERANCE))) {
-            return ReviewRejectionCode.FUTURE_TIMESTAMP;
         }
         if (isInvalid(review)) {
             return ReviewRejectionCode.INVALID_REVIEW;

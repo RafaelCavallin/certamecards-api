@@ -15,6 +15,7 @@ import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.Cookie;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -46,6 +47,7 @@ class PasswordResetFlowIT {
     private JavaMailSender mailSender;
 
     @Test
+    @DisplayName("TI-02 — recuperação de senha de ponta a ponta")
     void givenResetTokenUsedTwice_whenResetting_thenSecondUseIsRejectedAndOldSessionsRevoked() throws Exception {
         doNothing().when(mailSender).send(any(MimeMessage.class));
         registerConfirmAndLogin();

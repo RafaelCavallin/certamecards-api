@@ -16,6 +16,7 @@ import br.com.certamecards.user.persistence.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -58,6 +59,7 @@ class GoogleLoginFlowIT {
     private MutableClock mutableClock;
 
     @Test
+    @DisplayName("TI-03 — callback Google para e-mail novo e aceite dos termos")
     void givenNewGoogleEmail_whenCallbackSucceeds_thenUserCreatedAndTermsRequiredUntilAccepted() throws Exception {
         successHandler.onAuthenticationSuccess(
                 new MockHttpServletRequest(), new MockHttpServletResponse(), fakeGoogleAuthentication());

@@ -13,6 +13,7 @@ import br.com.certamecards.support.PostgresContainerSupport;
 import jakarta.mail.internet.MimeMessage;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,7 @@ class RegistrationLoginFlowIT {
     private JavaMailSender mailSender;
 
     @Test
+    @DisplayName("TI-01 — cadastro, e-mail, confirmação e login")
     void givenRegistrationFlow_whenLoggingInBeforeConfirmation_thenRejectedAndAfterConfirmation_thenSucceeds()
             throws Exception {
         doNothing().when(mailSender).send(any(MimeMessage.class));

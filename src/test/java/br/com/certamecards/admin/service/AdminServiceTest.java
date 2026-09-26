@@ -9,12 +9,14 @@ import static org.mockito.Mockito.when;
 
 import br.com.certamecards.common.error.ApiException;
 import br.com.certamecards.common.error.ErrorCode;
+import br.com.certamecards.common.security.UserAuthCache;
 import br.com.certamecards.user.domain.User;
 import br.com.certamecards.user.domain.UserRole;
 import br.com.certamecards.user.persistence.UserRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class AdminServiceTest {
@@ -22,7 +24,8 @@ class AdminServiceTest {
     private final UUID actorId = UUID.randomUUID();
     private final UserRepository userRepository = mock(UserRepository.class);
     private final AdminAuditRecorder auditRecorder = mock(AdminAuditRecorder.class);
-    private final AdminService adminService = new AdminService(userRepository, auditRecorder);
+    private final UserAuthCache userAuthCache = mock(UserAuthCache.class);
+    private final AdminService adminService = new AdminService(userRepository, auditRecorder, userAuthCache);
 
     @Test
     void givenExistingCandidateEmail_whenGranting_thenUserIsPromotedAndAuditRecorded() {
@@ -34,6 +37,18 @@ class AdminServiceTest {
         assertThat(result.getRole()).isEqualTo(UserRole.ADMIN);
         verify(userRepository).save(candidate);
         verify(auditRecorder).recordGranted(actorId, candidate);
+        verify(userAuthCache).evictAfterCommit(candidate.getId());
+    }
+
+    @Test
+    void givenExistingAdminEmail_whenGranting_thenNothingChangesAndCacheIsKept() {
+        User admin = new User("dora@exemplo.com", "Dora", UserRole.ADMIN);
+        when(userRepository.findByEmail("dora@exemplo.com")).thenReturn(Optional.of(admin));
+
+        adminService.grant(actorId, "dora@exemplo.com");
+
+        verify(userRepository, never()).save(admin);
+        verify(userAuthCache, never()).evictAfterCommit(admin.getId());
     }
 
     @Test
@@ -46,6 +61,7 @@ class AdminServiceTest {
     }
 
     @Test
+    @DisplayName("TU-29 — retirar o único admin lança last_admin")
     void givenSingleAdmin_whenRevokingSelf_thenThrowsLastAdmin() {
         User onlyAdmin = new User("ana@exemplo.com", "Ana", UserRole.ADMIN);
         when(userRepository.findById(onlyAdmin.getId())).thenReturn(Optional.of(onlyAdmin));
@@ -56,6 +72,7 @@ class AdminServiceTest {
                 .satisfies(ex -> assertThat(((ApiException) ex).getErrorCode()).isEqualTo(ErrorCode.LAST_ADMIN));
         verify(userRepository, never()).save(onlyAdmin);
         verify(auditRecorder, never()).recordRevoked(actorId, onlyAdmin);
+        verify(userAuthCache, never()).evictAfterCommit(onlyAdmin.getId());
     }
 
     @Test
@@ -69,6 +86,7 @@ class AdminServiceTest {
         assertThat(admin.getRole()).isEqualTo(UserRole.CANDIDATE);
         verify(userRepository).save(admin);
         verify(auditRecorder).recordRevoked(actorId, admin);
+        verify(userAuthCache).evictAfterCommit(admin.getId());
     }
 
     @Test

@@ -1,7 +1,6 @@
 package br.com.certamecards.card.service;
 
 import br.com.certamecards.card.domain.Card;
-import br.com.certamecards.card.domain.CardLimits;
 import br.com.certamecards.card.persistence.CardRepository;
 import br.com.certamecards.common.error.ApiException;
 import br.com.certamecards.common.error.ErrorCode;
@@ -21,6 +20,8 @@ public class CardService {
     private final DeckService deckService;
     private final CardStateService cardStateService;
     private final CardAccessResolver cardAccessResolver;
+    private final CardLimitGuard limitGuard;
+    private final CardRestorer restorer;
     private final Clock clock;
 
     public CardService(
@@ -28,11 +29,15 @@ public class CardService {
             DeckService deckService,
             CardStateService cardStateService,
             CardAccessResolver cardAccessResolver,
+            CardLimitGuard limitGuard,
+            CardRestorer restorer,
             Clock clock) {
         this.cardRepository = cardRepository;
         this.deckService = deckService;
         this.cardStateService = cardStateService;
         this.cardAccessResolver = cardAccessResolver;
+        this.limitGuard = limitGuard;
+        this.restorer = restorer;
         this.clock = clock;
     }
 
@@ -43,7 +48,7 @@ public class CardService {
             return new CardCreationResult(existing, false);
         }
         Deck deck = deckService.lockOwned(command.ownerId(), command.deckId());
-        ensureWithinLimits(deck.getId(), command.ownerId());
+        limitGuard.ensureWithinLimits(deck.getId(), command.ownerId());
         Card card = buildCard(command, deck.getId());
         return new CardCreationResult(cardRepository.saveAndFlush(card), true);
     }
@@ -56,6 +61,10 @@ public class CardService {
         card.editContent(content.front().strip(), content.back().strip(), content.normalizedSource());
         card.touch(clock.instant());
         return cardRepository.saveAndFlush(card);
+    }
+
+    public Card restore(UUID ownerId, UUID cardId, UUID targetDeckId, CardContent content) {
+        return restorer.restore(ownerId, findOwned(ownerId, cardId), targetDeckId, content);
     }
 
     @Transactional
@@ -74,17 +83,10 @@ public class CardService {
 
     @Transactional
     public CardState setSuspension(UUID userId, UUID cardId, boolean suspended) {
-        cardAccessResolver.resolveForRead(userId, cardId);
+        if (cardAccessResolver.resolveForRead(userId, cardId).isDeleted()) {
+            throw ApiException.of(ErrorCode.NOT_FOUND);
+        }
         return cardStateService.setSuspended(userId, cardId, suspended, clock.instant());
-    }
-
-    private void ensureWithinLimits(UUID deckId, UUID ownerId) {
-        if (cardRepository.countByDeckIdAndAudit_DeletedAtIsNull(deckId) >= CardLimits.MAX_CARDS_PER_DECK) {
-            throw ApiException.of(ErrorCode.DECK_CARD_LIMIT);
-        }
-        if (cardRepository.countActiveByOwnerId(ownerId) >= CardLimits.MAX_CARDS_PER_USER) {
-            throw ApiException.of(ErrorCode.USER_CARD_LIMIT);
-        }
     }
 
     private Card buildCard(CreateCardCommand command, UUID deckId) {

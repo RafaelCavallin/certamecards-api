@@ -5,6 +5,7 @@ import br.com.certamecards.common.error.ErrorCode;
 import br.com.certamecards.sync.domain.SyncMutationOperation;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
@@ -36,9 +37,25 @@ public class MutationPayloadReader {
         return read(operation, ProfilePatchPayload.class);
     }
 
+    public ConflictRestorePayload conflictRestore(SyncMutationOperation operation) {
+        return read(operation, ConflictRestorePayload.class);
+    }
+
+    public DeckMutationPayload deckSnapshot(JsonNode snapshot) {
+        return readNode(snapshot, DeckMutationPayload.class);
+    }
+
+    public CardMutationPayload cardSnapshot(JsonNode snapshot) {
+        return readNode(snapshot, CardMutationPayload.class);
+    }
+
     private <T> T read(SyncMutationOperation operation, Class<T> type) {
+        return readNode(operation.payload(), type);
+    }
+
+    private <T> T readNode(JsonNode node, Class<T> type) {
         try {
-            return objectMapper.treeToValue(operation.payload(), type);
+            return objectMapper.treeToValue(node, type);
         } catch (JacksonException exception) {
             throw ApiException.of(ErrorCode.VALIDATION_FAILED);
         }

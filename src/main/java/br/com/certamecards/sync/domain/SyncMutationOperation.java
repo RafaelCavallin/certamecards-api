@@ -1,5 +1,6 @@
 package br.com.certamecards.sync.domain;
 
+import br.com.certamecards.common.sync.EventClock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

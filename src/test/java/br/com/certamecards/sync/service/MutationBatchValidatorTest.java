@@ -3,7 +3,7 @@ package br.com.certamecards.sync.service;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import br.com.certamecards.common.error.ApiException;
-import br.com.certamecards.sync.domain.EventClock;
+import br.com.certamecards.common.sync.EventClock;
 import br.com.certamecards.sync.domain.SyncMutationBatch;
 import br.com.certamecards.sync.domain.SyncMutationOperation;
 import br.com.certamecards.sync.domain.SyncOperationKind;

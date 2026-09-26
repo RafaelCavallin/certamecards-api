@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import br.com.certamecards.support.PostgresContainerSupport;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,11 +26,13 @@ class MigrationsIT {
     private DataSource dataSource;
 
     @Test
+    @DisplayName("TI-21 — migrations Flyway do zero")
     void givenMigratedDatabase_whenValidating_thenSchemaHistoryIsClean() {
         assertThatCode(() -> flyway.validate()).doesNotThrowAnyException();
     }
 
     @Test
+    @DisplayName("TI-21 — seed de 7 matérias presente")
     void givenMigratedDatabase_whenCountingSubjects_thenSevenSeededSubjectsExist() {
         final JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         final Integer count = jdbcTemplate.queryForObject("SELECT count(*) FROM subjects", Integer.class);

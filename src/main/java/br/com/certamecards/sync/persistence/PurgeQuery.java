@@ -17,6 +17,9 @@ public class PurgeQuery {
                 UNION ALL
                 SELECT change_seq FROM decks d WHERE d.deleted_at IS NOT NULL AND d.deleted_at < :threshold
                     AND NOT EXISTS (SELECT 1 FROM cards c2 WHERE c2.deck_id = d.id)
+                UNION ALL
+                SELECT change_seq FROM sync_conflicts sc
+                    WHERE sc.expired_at IS NOT NULL AND sc.expired_at < :threshold
             ) purgeable
             """;
 
@@ -32,6 +35,9 @@ public class PurgeQuery {
             DELETE FROM decks d WHERE d.deleted_at IS NOT NULL AND d.deleted_at < :threshold
                 AND NOT EXISTS (SELECT 1 FROM cards c2 WHERE c2.deck_id = d.id)
             """;
+
+    private static final String DELETE_PURGEABLE_CONFLICTS =
+            "DELETE FROM sync_conflicts sc WHERE sc.expired_at IS NOT NULL AND sc.expired_at < :threshold";
 
     private final JdbcClient jdbcClient;
 
@@ -57,6 +63,13 @@ public class PurgeQuery {
     public int purgeDecks(Instant threshold) {
         return jdbcClient
                 .sql(DELETE_PURGEABLE_DECKS)
+                .param("threshold", Timestamp.from(threshold))
+                .update();
+    }
+
+    public int purgeConflicts(Instant threshold) {
+        return jdbcClient
+                .sql(DELETE_PURGEABLE_CONFLICTS)
                 .param("threshold", Timestamp.from(threshold))
                 .update();
     }

@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -127,6 +128,7 @@ class DeckCardApiIT {
     }
 
     @Test
+    @DisplayName("TI-11 — exclusão de deck propaga aos cartões")
     void givenDeckWithCards_whenDeletingDeck_thenDeckAndCardsAreSoftDeleted() throws Exception {
         String token = registerConfirmAndLogin("dara.candidata@exemplo.com", "Dara");
         UUID subjectId = firstSubjectId();
@@ -143,6 +145,7 @@ class DeckCardApiIT {
     }
 
     @Test
+    @DisplayName("TI-12 — zerar progresso")
     void givenStudiedCards_whenResettingProgress_thenReviewLogsAreInsertedAndReviewCountIncreases() throws Exception {
         String token = registerConfirmAndLogin("rui.candidato@exemplo.com", "Rui");
         UUID subjectId = firstSubjectId();
@@ -164,6 +167,7 @@ class DeckCardApiIT {
     }
 
     @Test
+    @DisplayName("TI-13 — editar cartão não toca no estado")
     void givenCard_whenEditingContent_thenVersionChangesButStateUnaffected() throws Exception {
         String token = registerConfirmAndLogin("clea.candidata@exemplo.com", "Clea");
         UUID subjectId = firstSubjectId();
@@ -181,6 +185,7 @@ class DeckCardApiIT {
     }
 
     @Test
+    @DisplayName("TI-14 — suspensão cria ou atualiza a linha de estado")
     void givenActiveCard_whenSuspending_thenCardStateIsCreatedSuspended() throws Exception {
         String token = registerConfirmAndLogin("igor.candidato@exemplo.com", "Igor");
         UUID subjectId = firstSubjectId();
@@ -197,6 +202,7 @@ class DeckCardApiIT {
     }
 
     @Test
+    @DisplayName("TI-15 — limite concorrente de cartões")
     void givenDeckNearCardLimit_whenCreatingCardsConcurrently_thenOnlyOneSucceedsAtTheLimit() throws Exception {
         String token = registerConfirmAndLogin("noel.candidato@exemplo.com", "Noel");
         UUID subjectId = firstSubjectId();

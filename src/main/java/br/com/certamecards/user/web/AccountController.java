@@ -3,6 +3,7 @@ package br.com.certamecards.user.web;
 import br.com.certamecards.common.security.AuthenticatedUser;
 import br.com.certamecards.user.service.AccountService;
 import br.com.certamecards.user.service.DeleteAccountCommand;
+import br.com.certamecards.user.service.TermsService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,9 +19,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AccountController {
 
     private final AccountService accountService;
+    private final TermsService termsService;
 
-    public AccountController(AccountService accountService) {
+    public AccountController(AccountService accountService, TermsService termsService) {
         this.accountService = accountService;
+        this.termsService = termsService;
     }
 
     @GetMapping("/api/me")
@@ -39,7 +42,7 @@ public class AccountController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void acceptTerms(
             @AuthenticationPrincipal AuthenticatedUser principal, @Valid @RequestBody AcceptTermsRequest request) {
-        accountService.acceptTerms(principal.id(), request.version());
+        termsService.accept(principal.id(), request.version());
     }
 
     @DeleteMapping("/api/me")

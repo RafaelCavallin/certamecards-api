@@ -6,4 +6,8 @@ import java.util.UUID;
 public interface SyncMutationHandler {
 
     MutationResult handle(UUID userId, MutationContext context);
+
+    default String currentSnapshot(UUID userId, UUID entityId) {
+        return "{}";
+    }
 }

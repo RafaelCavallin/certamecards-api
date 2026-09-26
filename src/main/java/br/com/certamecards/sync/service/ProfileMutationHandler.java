@@ -1,6 +1,6 @@
 package br.com.certamecards.sync.service;
 
-import br.com.certamecards.sync.domain.EventOrder;
+import br.com.certamecards.common.sync.EventOrder;
 import br.com.certamecards.sync.domain.MutationOutcome;
 import br.com.certamecards.sync.domain.MutationResult;
 import br.com.certamecards.sync.domain.SyncMutationOperation;

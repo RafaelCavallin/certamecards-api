@@ -2,8 +2,7 @@ package br.com.certamecards.review.domain;
 
 public enum ReviewRejectionCode {
     UNKNOWN_CARD("unknown_card"),
-    INVALID_REVIEW("invalid_review"),
-    FUTURE_TIMESTAMP("future_timestamp");
+    INVALID_REVIEW("invalid_review");
 
     private final String code;
 

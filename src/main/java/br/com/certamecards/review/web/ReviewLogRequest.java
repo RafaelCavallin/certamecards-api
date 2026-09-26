@@ -1,5 +1,6 @@
 package br.com.certamecards.review.web;
 
+import br.com.certamecards.common.sync.EventClock;
 import br.com.certamecards.review.service.ReviewLogInput;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
@@ -17,7 +18,9 @@ public record ReviewLogRequest(
         @NotNull JsonNode stateAfter,
         boolean offline,
         @NotNull UUID deviceId,
-        UUID sessionId) {
+        UUID sessionId,
+        @NotNull EventClock clock,
+        @NotNull Instant observedServerTime) {
 
     public ReviewLogInput toInput() {
         return new ReviewLogInput(
@@ -31,6 +34,8 @@ public record ReviewLogRequest(
                 stateAfter.toString(),
                 offline,
                 deviceId,
-                sessionId);
+                sessionId,
+                clock,
+                observedServerTime);
     }
 }

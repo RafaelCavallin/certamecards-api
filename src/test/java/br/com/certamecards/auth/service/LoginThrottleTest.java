@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageRequest;
 
@@ -28,6 +29,7 @@ class LoginThrottleTest {
     private final LoginThrottle throttle = new LoginThrottle(repository, properties, clock);
 
     @Test
+    @DisplayName("TU-24 — menos de 5 falhas recentes não bloqueia")
     void givenFewerThanFiveRecentFailures_whenEnsuringAllowed_thenDoesNotThrow() {
         List<LoginAttempt> failures = List.of(failureAt(NOW.minusSeconds(60)));
         when(repository.findByEmailAndSuccessFalseOrderByAttemptedAtDesc(EMAIL, PageRequest.of(0, 5)))
@@ -36,6 +38,7 @@ class LoginThrottleTest {
     }
 
     @Test
+    @DisplayName("TU-24 — 5 falhas dentro da janela de 15 min bloqueia")
     void givenFiveFailuresWithinWindow_whenEnsuringAllowed_thenThrowsLoginLocked() {
         List<LoginAttempt> failures = List.of(
                 failureAt(NOW.minusSeconds(10)),
@@ -51,6 +54,7 @@ class LoginThrottleTest {
     }
 
     @Test
+    @DisplayName("TU-24 — após 15 min a janela libera de novo")
     void givenFiveFailuresOutsideWindow_whenEnsuringAllowed_thenDoesNotThrow() {
         List<LoginAttempt> failures = List.of(
                 failureAt(NOW.minus(Duration.ofMinutes(16))),

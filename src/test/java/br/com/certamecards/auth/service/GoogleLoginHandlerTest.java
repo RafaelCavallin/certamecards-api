@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class GoogleLoginHandlerTest {
@@ -34,6 +35,7 @@ class GoogleLoginHandlerTest {
             new GoogleLoginHandler(oauthIdentityRepository, userRepository, oneTimeTokenService, clock);
 
     @Test
+    @DisplayName("TU-32 — identidade já vinculada conclui com o usuário existente")
     void givenIdentityAlreadyLinked_whenHandlingLogin_thenConcludesWithExistingUser() {
         UUID userId = UUID.randomUUID();
         OauthIdentity identity = new OauthIdentity(userId, OauthProvider.GOOGLE, SUBJECT, EMAIL);
@@ -47,6 +49,7 @@ class GoogleLoginHandlerTest {
     }
 
     @Test
+    @DisplayName("TU-32 — e-mail novo cria o usuário e conclui")
     void givenNoUserWithEmail_whenHandlingLogin_thenCreatesUserAndConcludes() {
         when(oauthIdentityRepository.findByProviderAndSubject(OauthProvider.GOOGLE, SUBJECT))
                 .thenReturn(Optional.empty());
@@ -74,6 +77,7 @@ class GoogleLoginHandlerTest {
     }
 
     @Test
+    @DisplayName("TU-32 — e-mail com senha exige vincular antes de concluir")
     void givenExistingUserWithPassword_whenHandlingLogin_thenReturnsLinkRequiredToken() {
         User user = new User(EMAIL, "Ana", UserRole.CANDIDATE);
         user.changePasswordHash("hashed-password");

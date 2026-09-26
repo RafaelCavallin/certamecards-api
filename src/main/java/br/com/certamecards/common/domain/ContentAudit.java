@@ -41,4 +41,9 @@ public class ContentAudit {
         this.deletedAt = now;
         this.updatedAt = now;
     }
+
+    public void restore(Instant now) {
+        this.deletedAt = null;
+        this.updatedAt = now;
+    }
 }

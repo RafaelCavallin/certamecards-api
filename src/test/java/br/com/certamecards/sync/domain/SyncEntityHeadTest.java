@@ -2,6 +2,7 @@ package br.com.certamecards.sync.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import br.com.certamecards.common.sync.EventClock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

@@ -1,3 +1,3 @@
 package br.com.certamecards.sync.service;
 
-public record PurgeResult(int purgedCards, int purgedDecks) {}
+public record PurgeResult(int purgedCards, int purgedDecks, int purgedConflicts) {}
